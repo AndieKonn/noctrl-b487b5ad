@@ -692,7 +692,7 @@ function EventsManager({
             return (
               <div key={e.id} className="overflow-hidden rounded-xl border border-border bg-card">
                 {e.poster_url ? (
-                  <img src={e.poster_url} alt={e.title} className="h-40 w-full object-cover" />
+                  <img src={posterSrc(e.poster_url)} alt={e.title} className="h-40 w-full object-cover" />
                 ) : (
                   <div className="flex h-40 items-center justify-center bg-muted text-xs uppercase tracking-widest text-muted-foreground">
                     No poster
@@ -819,7 +819,7 @@ function EventFormDialog({
             <Label>Poster image</Label>
             {form.poster_url && (
               <img
-                src={form.poster_url}
+                src={posterSrc(form.poster_url)}
                 alt="poster preview"
                 className="mb-2 h-40 w-full rounded object-cover"
               />
