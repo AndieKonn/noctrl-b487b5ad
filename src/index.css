@@ -2,95 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
+/* NoCTRL — black & yellow, glassmorphism. All colors HSL. */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 60 12% 8%;
+    --foreground: 55 30% 96%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 60 10% 13%;
+    --card-foreground: 55 30% 96%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 60 10% 11%;
+    --popover-foreground: 55 30% 96%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 50 95% 60%;
+    --primary-foreground: 60 12% 8%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 60 8% 18%;
+    --secondary-foreground: 55 30% 96%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 60 8% 16%;
+    --muted-foreground: 55 12% 70%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 50 95% 60%;
+    --accent-foreground: 60 12% 8%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 50 40% 50%;
+    --input: 60 8% 16%;
+    --ring: 50 95% 60%;
 
-    --radius: 0.5rem;
+    --gold: 50 95% 60%;
+    --gold-foreground: 60 12% 8%;
 
-    --sidebar-background: 0 0% 98%;
+    --radius: 0.75rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --gradient-hero: radial-gradient(ellipse at top, hsl(50 95% 60% / 0.35), transparent 60%),
+      radial-gradient(ellipse at bottom right, hsl(40 95% 55% / 0.25), transparent 60%),
+      radial-gradient(ellipse at bottom left, hsl(60 90% 60% / 0.2), transparent 60%);
+    --shadow-glow: 0 0 80px hsl(50 95% 60% / 0.35);
+    --glass-bg: hsl(60 10% 13% / 0.55);
+    --glass-strong-bg: hsl(60 10% 13% / 0.75);
+    --glass-border: hsl(50 95% 60% / 0.18);
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 60 10% 11%;
+    --sidebar-foreground: 55 30% 96%;
+    --sidebar-primary: 50 95% 60%;
+    --sidebar-primary-foreground: 60 12% 8%;
+    --sidebar-accent: 60 8% 18%;
+    --sidebar-accent-foreground: 55 30% 96%;
+    --sidebar-border: 50 95% 60% / 0.18;
+    --sidebar-ring: 50 95% 60%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --background: 60 12% 8%;
+    --foreground: 55 30% 96%;
   }
 }
 
@@ -101,5 +69,33 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: "Inter", system-ui, sans-serif;
+    background-image:
+      radial-gradient(ellipse at 20% 0%, hsl(50 95% 60% / 0.12), transparent 50%),
+      radial-gradient(ellipse at 80% 100%, hsl(40 95% 55% / 0.10), transparent 50%);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3 {
+    font-family: "Bebas Neue", "Inter", sans-serif;
+    letter-spacing: 0.02em;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background-color: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--glass-border);
+  }
+  .glass-strong {
+    background-color: var(--glass-strong-bg);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid var(--glass-border);
+  }
+  .font-display {
+    font-family: "Bebas Neue", "Inter", sans-serif;
   }
 }
