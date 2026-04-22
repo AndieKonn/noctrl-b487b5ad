@@ -308,9 +308,37 @@ export default function Index() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="NoCTRL on Instagram"
-              className="group inline-flex items-center justify-center rounded-full border border-primary/40 bg-primary/10 p-2 md:p-2.5 text-primary transition-all duration-300 hover:scale-110 hover:bg-primary/20 hover:text-accent hover:shadow-[var(--shadow-glow)]"
+              className="group inline-flex items-center justify-center rounded-xl p-1 transition-all duration-300 hover:scale-110 hover:shadow-[var(--shadow-glow)]"
             >
-              <Instagram className="h-5 w-5 md:h-6 md:w-6" strokeWidth={2.5} />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 32 32"
+                className="h-8 w-8 md:h-10 md:w-10"
+                aria-hidden="true"
+              >
+                <defs>
+                  <radialGradient id="ig-grad" cx="30%" cy="107%" r="150%">
+                    <stop offset="0%" stopColor="#fdf497" />
+                    <stop offset="5%" stopColor="#fdf497" />
+                    <stop offset="45%" stopColor="#fd5949" />
+                    <stop offset="60%" stopColor="#d6249f" />
+                    <stop offset="90%" stopColor="#285AEB" />
+                  </radialGradient>
+                </defs>
+                <rect x="2" y="2" width="28" height="28" rx="7" fill="url(#ig-grad)" />
+                <rect
+                  x="6.5"
+                  y="6.5"
+                  width="19"
+                  height="19"
+                  rx="5.5"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2"
+                />
+                <circle cx="16" cy="16" r="4.5" fill="none" stroke="#fff" strokeWidth="2" />
+                <circle cx="22.5" cy="9.5" r="1.4" fill="#fff" />
+              </svg>
             </a>
           </div>
         </nav>
