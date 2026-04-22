@@ -451,13 +451,18 @@ function EventsManager({
       cacheControl: "3600",
       upsert: false,
     });
-    setUploading(false);
     if (error) {
+      setUploading(false);
       toast.error("Upload failed: " + error.message);
       return;
     }
-    const { data } = supabase.storage.from("event-posters").getPublicUrl(path);
-    setForm((f) => ({ ...f, poster_url: data.publicUrl }));
+    // Store the storage path; signed URLs are generated at render time.
+    const { data: signed } = await supabase.storage
+      .from("event-posters")
+      .createSignedUrl(path, 3600);
+    setForm((f) => ({ ...f, poster_url: path }));
+    setPreviewUrls((p) => ({ ...p, [path]: signed?.signedUrl ?? "" }));
+    setUploading(false);
     toast.success("Poster uploaded");
   };
 
