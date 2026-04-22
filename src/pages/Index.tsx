@@ -53,9 +53,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_REGEX = /^\+?[0-9\s().-]{7,20}$/;
 
 const generateTicketCode = () => {
-  let s = "";
-  for (let i = 0; i < 16; i++) s += Math.floor(Math.random() * 10).toString();
-  return s;
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => (b % 10).toString()).join("");
 };
 
 const splitPerks = (s: string) =>
@@ -68,6 +68,7 @@ export default function Index() {
   const [events, setEvents] = useState<ActiveEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [posterUrls, setPosterUrls] = useState<Record<string, string>>({});
   const [tier, setTier] = useState<TierId>("standard");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -96,8 +97,31 @@ export default function Index() {
       setEvents(list);
       if (list.length > 0) setSelectedEventId(list[0].id);
       setLoading(false);
+
+      // Resolve signed URLs for any poster paths (private bucket).
+      const paths = list
+        .map((e) => e.poster_url)
+        .filter((p): p is string => !!p && !p.startsWith("http"));
+      if (paths.length > 0) {
+        const entries: [string, string][] = [];
+        for (const path of paths) {
+          const { data: signed } = await supabase.storage
+            .from("event-posters")
+            .createSignedUrl(path, 3600);
+          if (signed?.signedUrl) entries.push([path, signed.signedUrl]);
+        }
+        if (entries.length > 0) {
+          setPosterUrls((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+        }
+      }
     })();
   }, []);
+
+  const posterFor = (val: string | null) => {
+    if (!val) return "";
+    if (val.startsWith("http")) return val;
+    return posterUrls[val] ?? "";
+  };
 
   const event = useMemo(
     () => events.find((e) => e.id === selectedEventId) ?? null,
@@ -187,18 +211,13 @@ export default function Index() {
     let validatedCode: string | null = null;
     if (prCode.trim()) {
       const code = prCode.trim().toUpperCase();
-      const { data: codeRow } = await supabase
-        .from("pr_codes")
-        .select("code")
-        .eq("code", code)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (!codeRow) {
+      const { data: validCode } = await supabase.rpc("validate_pr_code", { _code: code });
+      if (!validCode) {
         setSubmitting(false);
         toast.error("Invalid PR code. Leave blank or check the code.");
         return;
       }
-      validatedCode = codeRow.code;
+      validatedCode = validCode;
     }
 
     const ticketCode = generateTicketCode();
@@ -238,11 +257,6 @@ export default function Index() {
       "create-checkout",
       {
         body: {
-          tierName: selected.name,
-          eventTitle: event.title,
-          priceEur: selected.price,
-          quantity,
-          email,
           ticketCode,
           successUrl: `${origin}/?payment=success&ticket=${ticketCode}`,
           cancelUrl: `${origin}/?payment=cancelled`,
@@ -335,10 +349,10 @@ export default function Index() {
 
           {event && (
             <div className="mt-8 space-y-4 text-center">
-              {event.poster_url && (
+              {event.poster_url && posterFor(event.poster_url) && (
                 <div className="mx-auto max-w-4xl">
                   <img
-                    src={event.poster_url}
+                    src={posterFor(event.poster_url)}
                     alt={event.title}
                     className="mx-auto max-h-[600px] w-full rounded-2xl object-contain shadow-[var(--shadow-glow)]"
                   />

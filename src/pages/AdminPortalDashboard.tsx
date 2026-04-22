@@ -117,11 +117,6 @@ function Dashboard() {
         navigate("/admin-portal");
         return;
       }
-      try {
-        await supabase.rpc("ensure_admin_role");
-      } catch {
-        // ignore
-      }
       const { data: isAdminData, error: roleError } = await supabase.rpc("has_role", {
         _user_id: sessionData.session.user.id,
         _role: "admin",
@@ -412,6 +407,33 @@ function EventsManager({
   const [uploading, setUploading] = useState(false);
   const [viewingEventId, setViewingEventId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Booking | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+
+  // Resolve signed URLs for any event posters (storage paths) we don't have a URL for yet.
+  useEffect(() => {
+    const missing = events
+      .map((e) => e.poster_url)
+      .filter((p): p is string => !!p && !p.startsWith("http") && !(p in previewUrls));
+    if (missing.length === 0) return;
+    (async () => {
+      const entries: [string, string][] = [];
+      for (const path of missing) {
+        const { data } = await supabase.storage
+          .from("event-posters")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) entries.push([path, data.signedUrl]);
+      }
+      if (entries.length > 0) {
+        setPreviewUrls((p) => ({ ...p, ...Object.fromEntries(entries) }));
+      }
+    })();
+  }, [events, previewUrls]);
+
+  const posterSrc = (val: string | null | undefined) => {
+    if (!val) return "";
+    if (val.startsWith("http")) return val; // legacy public URLs
+    return previewUrls[val] ?? "";
+  };
 
   const viewingEvent = events.find((e) => e.id === viewingEventId) ?? null;
   const eventBookings = viewingEventId
@@ -456,13 +478,18 @@ function EventsManager({
       cacheControl: "3600",
       upsert: false,
     });
-    setUploading(false);
     if (error) {
+      setUploading(false);
       toast.error("Upload failed: " + error.message);
       return;
     }
-    const { data } = supabase.storage.from("event-posters").getPublicUrl(path);
-    setForm((f) => ({ ...f, poster_url: data.publicUrl }));
+    // Store the storage path; signed URLs are generated at render time.
+    const { data: signed } = await supabase.storage
+      .from("event-posters")
+      .createSignedUrl(path, 3600);
+    setForm((f) => ({ ...f, poster_url: path }));
+    setPreviewUrls((p) => ({ ...p, [path]: signed?.signedUrl ?? "" }));
+    setUploading(false);
     toast.success("Poster uploaded");
   };
 
@@ -630,6 +657,7 @@ function EventsManager({
           uploading={uploading}
           onUpload={handleUpload}
           onSave={handleSave}
+          posterPreviewUrl={posterSrc(form.poster_url)}
         />
       </div>
     );
@@ -665,7 +693,7 @@ function EventsManager({
             return (
               <div key={e.id} className="overflow-hidden rounded-xl border border-border bg-card">
                 {e.poster_url ? (
-                  <img src={e.poster_url} alt={e.title} className="h-40 w-full object-cover" />
+                  <img src={posterSrc(e.poster_url)} alt={e.title} className="h-40 w-full object-cover" />
                 ) : (
                   <div className="flex h-40 items-center justify-center bg-muted text-xs uppercase tracking-widest text-muted-foreground">
                     No poster
@@ -730,6 +758,7 @@ function EventsManager({
         uploading={uploading}
         onUpload={handleUpload}
         onSave={handleSave}
+        posterPreviewUrl={posterSrc(form.poster_url)}
       />
     </div>
   );
@@ -747,6 +776,7 @@ function EventFormDialog({
   uploading,
   onUpload,
   onSave,
+  posterPreviewUrl,
 }: {
   open: boolean;
   setOpen: (o: boolean) => void;
@@ -757,6 +787,7 @@ function EventFormDialog({
   uploading: boolean;
   onUpload: (file: File) => void;
   onSave: () => void;
+  posterPreviewUrl: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -790,9 +821,9 @@ function EventFormDialog({
           </div>
           <div>
             <Label>Poster image</Label>
-            {form.poster_url && (
+            {form.poster_url && posterPreviewUrl && (
               <img
-                src={form.poster_url}
+                src={posterPreviewUrl}
                 alt="poster preview"
                 className="mb-2 h-40 w-full rounded object-cover"
               />
