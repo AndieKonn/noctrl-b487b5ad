@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Check, Sparkles, AlertTriangle, Ticket } from "lucide-react";
+import { Check, Sparkles, AlertTriangle, Ticket, Instagram } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -280,7 +280,7 @@ export default function Index() {
         className="relative overflow-hidden border-b border-border"
         style={{ backgroundImage: "var(--gradient-hero)" }}
       >
-        <nav className="relative z-10 flex items-center justify-between px-6 py-5 md:px-10">
+        <nav className="relative z-10 flex items-center justify-between gap-3 px-4 py-5 md:px-10">
           <div className="flex items-center gap-2">
             <img
               src={logo}
@@ -288,6 +288,30 @@ export default function Index() {
               className="h-8 w-8 object-contain md:h-10 md:w-10"
             />
             <span className="font-display text-2xl tracking-widest md:text-3xl">NOCTRL</span>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <a
+              href="mailto:noctrlcy@gmail.com"
+              className="hidden sm:inline-block bg-gradient-to-r from-primary via-accent to-gold bg-clip-text font-bold text-transparent text-sm md:text-base tracking-wide hover:opacity-80 transition-opacity"
+            >
+              noctrlcy@gmail.com
+            </a>
+            <a
+              href="mailto:noctrlcy@gmail.com"
+              aria-label="Email NoCTRL"
+              className="sm:hidden inline-flex items-center justify-center rounded-full border border-primary/40 bg-primary/10 p-2 text-primary transition-all hover:bg-primary/20"
+            >
+              <span className="font-bold text-xs">@</span>
+            </a>
+            <a
+              href="https://www.instagram.com/no.ctrl_events/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="NoCTRL on Instagram"
+              className="group inline-flex items-center justify-center rounded-full border border-primary/40 bg-primary/10 p-2 md:p-2.5 text-primary transition-all duration-300 hover:scale-110 hover:bg-primary/20 hover:text-accent hover:shadow-[var(--shadow-glow)]"
+            >
+              <Instagram className="h-5 w-5 md:h-6 md:w-6" strokeWidth={2.5} />
+            </a>
           </div>
         </nav>
 
