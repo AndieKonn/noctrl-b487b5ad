@@ -117,11 +117,6 @@ function Dashboard() {
         navigate("/admin-portal");
         return;
       }
-      try {
-        await supabase.rpc("ensure_admin_role");
-      } catch {
-        // ignore
-      }
       const { data: isAdminData, error: roleError } = await supabase.rpc("has_role", {
         _user_id: sessionData.session.user.id,
         _role: "admin",

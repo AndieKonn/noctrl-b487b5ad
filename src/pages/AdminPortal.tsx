@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 
 export default function AdminPortal() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const mode = "signin" as const;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,40 +39,9 @@ export default function AdminPortal() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/admin-portal` },
-        });
-        if (error) throw error;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
 
-        const existingAccount = !data.session && (data.user?.identities?.length ?? 0) === 0;
-        if (existingAccount) {
-          toast.error(
-            "This email already has an account. Sign in instead — Supabase will not send a new confirmation email for an existing user.",
-          );
-          setMode("signin");
-          return;
-        }
-
-        if (!data.session) {
-          toast.success("Check your email to confirm the account, then sign in.");
-          setMode("signin");
-          return;
-        }
-
-        toast.success("Account created. Signing you in...");
-      }
-
-      try {
-        await supabase.rpc("ensure_admin_role");
-      } catch {
-        // ignore
-      }
       if (!redirectingRef.current) {
         redirectingRef.current = true;
         navigate("/admin-portal/dashboard");
@@ -95,9 +64,7 @@ export default function AdminPortal() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="glass w-full max-w-sm rounded-2xl p-8">
-        <h1 className="font-display text-3xl tracking-wide">
-          Admin {mode === "signin" ? "Sign In" : "Sign Up"}
-        </h1>
+        <h1 className="font-display text-3xl tracking-wide">Admin Sign In</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Restricted to authorized accounts only.
         </p>
@@ -126,18 +93,9 @@ export default function AdminPortal() {
             />
           </div>
           <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Please wait..." : mode === "signin" ? "Sign In" : "Create Account"}
+            {loading ? "Please wait..." : "Sign In"}
           </Button>
         </form>
-        <button
-          type="button"
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
-        >
-          {mode === "signin"
-            ? "First time? Create the admin account"
-            : "Have an account? Sign in"}
-        </button>
       </div>
     </div>
   );

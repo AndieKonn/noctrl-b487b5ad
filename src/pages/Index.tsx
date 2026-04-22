@@ -53,9 +53,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_REGEX = /^\+?[0-9\s().-]{7,20}$/;
 
 const generateTicketCode = () => {
-  let s = "";
-  for (let i = 0; i < 16; i++) s += Math.floor(Math.random() * 10).toString();
-  return s;
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => (b % 10).toString()).join("");
 };
 
 const splitPerks = (s: string) =>
@@ -187,18 +187,13 @@ export default function Index() {
     let validatedCode: string | null = null;
     if (prCode.trim()) {
       const code = prCode.trim().toUpperCase();
-      const { data: codeRow } = await supabase
-        .from("pr_codes")
-        .select("code")
-        .eq("code", code)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (!codeRow) {
+      const { data: validCode } = await supabase.rpc("validate_pr_code", { _code: code });
+      if (!validCode) {
         setSubmitting(false);
         toast.error("Invalid PR code. Leave blank or check the code.");
         return;
       }
-      validatedCode = codeRow.code;
+      validatedCode = validCode;
     }
 
     const ticketCode = generateTicketCode();
@@ -238,11 +233,6 @@ export default function Index() {
       "create-checkout",
       {
         body: {
-          tierName: selected.name,
-          eventTitle: event.title,
-          priceEur: selected.price,
-          quantity,
-          email,
           ticketCode,
           successUrl: `${origin}/?payment=success&ticket=${ticketCode}`,
           cancelUrl: `${origin}/?payment=cancelled`,

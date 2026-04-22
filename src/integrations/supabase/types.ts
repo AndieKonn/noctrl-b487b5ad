@@ -194,6 +194,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_pr_code: { Args: { _code: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"
