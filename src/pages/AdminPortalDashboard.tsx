@@ -657,6 +657,7 @@ function EventsManager({
           uploading={uploading}
           onUpload={handleUpload}
           onSave={handleSave}
+          posterPreviewUrl={posterSrc(form.poster_url)}
         />
       </div>
     );
@@ -757,6 +758,7 @@ function EventsManager({
         uploading={uploading}
         onUpload={handleUpload}
         onSave={handleSave}
+        posterPreviewUrl={posterSrc(form.poster_url)}
       />
     </div>
   );
@@ -774,6 +776,7 @@ function EventFormDialog({
   uploading,
   onUpload,
   onSave,
+  posterPreviewUrl,
 }: {
   open: boolean;
   setOpen: (o: boolean) => void;
@@ -784,6 +787,7 @@ function EventFormDialog({
   uploading: boolean;
   onUpload: (file: File) => void;
   onSave: () => void;
+  posterPreviewUrl: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -817,9 +821,9 @@ function EventFormDialog({
           </div>
           <div>
             <Label>Poster image</Label>
-            {form.poster_url && (
+            {form.poster_url && posterPreviewUrl && (
               <img
-                src={posterSrc(form.poster_url)}
+                src={posterPreviewUrl}
                 alt="poster preview"
                 className="mb-2 h-40 w-full rounded object-cover"
               />
