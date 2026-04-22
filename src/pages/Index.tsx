@@ -349,10 +349,10 @@ export default function Index() {
 
           {event && (
             <div className="mt-8 space-y-4 text-center">
-              {event.poster_url && (
+              {event.poster_url && posterFor(event.poster_url) && (
                 <div className="mx-auto max-w-4xl">
                   <img
-                    src={event.poster_url}
+                    src={posterFor(event.poster_url)}
                     alt={event.title}
                     className="mx-auto max-h-[600px] w-full rounded-2xl object-contain shadow-[var(--shadow-glow)]"
                   />
