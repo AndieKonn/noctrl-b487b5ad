@@ -407,6 +407,33 @@ function EventsManager({
   const [uploading, setUploading] = useState(false);
   const [viewingEventId, setViewingEventId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Booking | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+
+  // Resolve signed URLs for any event posters (storage paths) we don't have a URL for yet.
+  useEffect(() => {
+    const missing = events
+      .map((e) => e.poster_url)
+      .filter((p): p is string => !!p && !p.startsWith("http") && !(p in previewUrls));
+    if (missing.length === 0) return;
+    (async () => {
+      const entries: [string, string][] = [];
+      for (const path of missing) {
+        const { data } = await supabase.storage
+          .from("event-posters")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) entries.push([path, data.signedUrl]);
+      }
+      if (entries.length > 0) {
+        setPreviewUrls((p) => ({ ...p, ...Object.fromEntries(entries) }));
+      }
+    })();
+  }, [events, previewUrls]);
+
+  const posterSrc = (val: string | null | undefined) => {
+    if (!val) return "";
+    if (val.startsWith("http")) return val; // legacy public URLs
+    return previewUrls[val] ?? "";
+  };
 
   const viewingEvent = events.find((e) => e.id === viewingEventId) ?? null;
   const eventBookings = viewingEventId
