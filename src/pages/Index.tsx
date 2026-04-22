@@ -68,6 +68,7 @@ export default function Index() {
   const [events, setEvents] = useState<ActiveEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [posterUrls, setPosterUrls] = useState<Record<string, string>>({});
   const [tier, setTier] = useState<TierId>("standard");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -96,8 +97,31 @@ export default function Index() {
       setEvents(list);
       if (list.length > 0) setSelectedEventId(list[0].id);
       setLoading(false);
+
+      // Resolve signed URLs for any poster paths (private bucket).
+      const paths = list
+        .map((e) => e.poster_url)
+        .filter((p): p is string => !!p && !p.startsWith("http"));
+      if (paths.length > 0) {
+        const entries: [string, string][] = [];
+        for (const path of paths) {
+          const { data: signed } = await supabase.storage
+            .from("event-posters")
+            .createSignedUrl(path, 3600);
+          if (signed?.signedUrl) entries.push([path, signed.signedUrl]);
+        }
+        if (entries.length > 0) {
+          setPosterUrls((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+        }
+      }
     })();
   }, []);
+
+  const posterFor = (val: string | null) => {
+    if (!val) return "";
+    if (val.startsWith("http")) return val;
+    return posterUrls[val] ?? "";
+  };
 
   const event = useMemo(
     () => events.find((e) => e.id === selectedEventId) ?? null,
