@@ -85,6 +85,28 @@ export default function Index() {
     tierName: string;
     fullName: string;
   } | null>(null);
+  const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
+  const [successTicketCode, setSuccessTicketCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    if (payment === "success") {
+      setSuccessTicketCode(params.get("ticket"));
+      setPaymentSuccessOpen(true);
+      toast.success("Payment successful! Your booking is confirmed.");
+      // Clean the URL so refreshing doesn't re-trigger the popup
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      url.searchParams.delete("ticket");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    } else if (payment === "cancelled") {
+      toast.error("Payment cancelled. You can try again anytime.");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
