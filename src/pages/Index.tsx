@@ -85,6 +85,28 @@ export default function Index() {
     tierName: string;
     fullName: string;
   } | null>(null);
+  const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
+  const [successTicketCode, setSuccessTicketCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    if (payment === "success") {
+      setSuccessTicketCode(params.get("ticket"));
+      setPaymentSuccessOpen(true);
+      toast.success("Payment successful! Your booking is confirmed.");
+      // Clean the URL so refreshing doesn't re-trigger the popup
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      url.searchParams.delete("ticket");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    } else if (payment === "cancelled") {
+      toast.error("Payment cancelled. You can try again anytime.");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("payment");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -665,6 +687,40 @@ export default function Index() {
           )}
           <DialogFooter>
             <Button onClick={() => setIssuedTicket(null)} className="w-full">
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paymentSuccessOpen} onOpenChange={setPaymentSuccessOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <Check className="h-6 w-6 text-primary" /> Payment Successful!
+            </DialogTitle>
+            <DialogDescription>
+              Thank you — your booking is confirmed. A confirmation has been sent to your email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/10 to-accent/10 p-6 text-center">
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">
+              Booking Confirmed
+            </div>
+            <div className="font-display text-xl tracking-wide">See you on the dancefloor 🎉</div>
+            {successTicketCode && (
+              <>
+                <div className="rounded-lg border border-border bg-background/50 p-3 font-mono text-lg tracking-[0.2em]">
+                  {successTicketCode.match(/.{1,4}/g)?.join(" ")}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ticket ID — keep this for entry
+                </p>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setPaymentSuccessOpen(false)} className="w-full">
               Done
             </Button>
           </DialogFooter>
