@@ -30,7 +30,7 @@ export default function StaffLogin() {
       });
       if (!error && data === true) {
         redirectingRef.current = true;
-        navigate("/staff/scan", { replace: true });
+        navigate(safeNext, { replace: true });
       } else {
         setChecking(false);
       }
@@ -64,7 +64,7 @@ export default function StaffLogin() {
         throw new Error("This account is not a staff scanner.");
       }
       redirectingRef.current = true;
-      navigate("/staff/scan", { replace: true });
+      navigate(safeNext, { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Sign in failed";
       toast.error(msg);
