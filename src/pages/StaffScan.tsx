@@ -77,7 +77,7 @@ export default function StaffScan() {
   const handleSignOut = useCallback(async () => {
     try {
       await scannerRef.current?.stop();
-      await scannerRef.current?.clear();
+      scannerRef.current?.clear();
     } catch {
       /* ignore */
     }
@@ -213,7 +213,11 @@ export default function StaffScan() {
           .stop()
           .catch(() => undefined)
           .finally(() => {
-            inst.clear().catch(() => undefined);
+            try {
+              inst.clear();
+            } catch {
+              /* ignore */
+            }
           });
       }
       scannerRef.current = null;
