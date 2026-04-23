@@ -23,38 +23,39 @@ function buildEmailHtml(opts: {
     ? "VIP Reservation"
     : "Standard Reservation";
   const dateLine = opts.eventDate
-    ? `<tr><td style="padding:6px 0;color:#bbbbbb;">Date</td><td style="padding:6px 0;color:#ffffff;text-align:right;font-weight:600;">${opts.eventDate}</td></tr>`
+    ? `<tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Date</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${opts.eventDate}</td></tr>`
     : "";
+  // NoCTRL palette — black background, golden-yellow accents (HSL 50 95% 60% ≈ #f5d63d)
   return `<!DOCTYPE html>
-<html><body style="margin:0;padding:0;background:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#ffffff;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#000000;padding:32px 16px;">
+<html><body style="margin:0;padding:0;background:#16150f;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#f7f3e3;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#16150f;background-image:radial-gradient(ellipse at top, rgba(245,214,61,0.18), transparent 60%),radial-gradient(ellipse at bottom right, rgba(232,184,42,0.12), transparent 60%);padding:40px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#0a0a0a;border:1px solid #1f1f1f;border-radius:14px;overflow:hidden;">
-        <tr><td style="padding:28px 28px 8px 28px;border-bottom:2px solid #e11d2a;">
-          <div style="font-size:12px;letter-spacing:4px;color:#e11d2a;font-weight:700;text-transform:uppercase;">NoCTRL</div>
-          <h1 style="margin:8px 0 0 0;font-size:26px;color:#ffffff;font-weight:800;letter-spacing:-0.5px;">Payment Confirmed</h1>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background:rgba(31,30,21,0.85);border:1px solid rgba(245,214,61,0.25);border-radius:18px;overflow:hidden;box-shadow:0 0 80px rgba(245,214,61,0.18);">
+        <tr><td style="padding:32px 32px 18px 32px;border-bottom:1px solid rgba(245,214,61,0.18);">
+          <div style="font-family:'Bebas Neue','Inter',sans-serif;font-size:14px;letter-spacing:6px;color:#f5d63d;font-weight:700;text-transform:uppercase;">NoCTRL Events</div>
+          <h1 style="margin:10px 0 0 0;font-family:'Bebas Neue','Inter',sans-serif;font-size:42px;color:#f5d63d;font-weight:400;letter-spacing:2px;text-transform:uppercase;line-height:1;">You're In.</h1>
         </td></tr>
-        <tr><td style="padding:24px 28px 8px 28px;">
-          <p style="margin:0 0 16px 0;font-size:16px;color:#ffffff;line-height:1.5;">Hey ${opts.fullName},</p>
-          <p style="margin:0 0 20px 0;font-size:15px;color:#cccccc;line-height:1.6;">
-            Your booking for <span style="color:#ffffff;font-weight:700;">${opts.eventTitle}</span> is confirmed.
-            Show the QR code below at the door for entry.
+        <tr><td style="padding:28px 32px 8px 32px;">
+          <p style="margin:0 0 14px 0;font-size:16px;color:#f7f3e3;line-height:1.5;">Hey ${opts.fullName},</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#d8d2b8;line-height:1.65;">
+            Payment confirmed for <span style="color:#f5d63d;font-weight:700;">${opts.eventTitle}</span>.
+            Flash the QR below at the door — that's your ticket in.
           </p>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111111;border:1px solid #1f1f1f;border-radius:10px;padding:16px;margin:0 0 20px 0;">
-            <tr><td style="padding:6px 0;color:#bbbbbb;">Tier</td><td style="padding:6px 0;color:#ffffff;text-align:right;font-weight:600;">${tierLabel}</td></tr>
-            <tr><td style="padding:6px 0;color:#bbbbbb;">Guests</td><td style="padding:6px 0;color:#ffffff;text-align:right;font-weight:600;">${opts.guests}</td></tr>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(20,19,13,0.7);border:1px solid rgba(245,214,61,0.2);border-radius:12px;padding:18px 20px;margin:0 0 24px 0;">
+            <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Tier</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${tierLabel}</td></tr>
+            <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Guests</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${opts.guests}</td></tr>
             ${dateLine}
-            <tr><td style="padding:6px 0;color:#bbbbbb;">Ticket Code</td><td style="padding:6px 0;color:#e11d2a;text-align:right;font-weight:700;font-family:monospace;">${opts.ticketCode}</td></tr>
+            <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Ticket Code</td><td style="padding:8px 0;color:#f5d63d;text-align:right;font-weight:700;font-family:'Courier New',monospace;font-size:15px;letter-spacing:1px;">${opts.ticketCode}</td></tr>
           </table>
         </td></tr>
-        <tr><td align="center" style="padding:8px 28px 28px 28px;">
-          <div style="background:#ffffff;display:inline-block;padding:14px;border-radius:10px;">
-            <img src="cid:ticket-qr" alt="Ticket QR Code" width="220" height="220" style="display:block;width:220px;height:220px;" />
+        <tr><td align="center" style="padding:8px 32px 32px 32px;">
+          <div style="background:#f7f3e3;display:inline-block;padding:18px;border-radius:14px;border:2px solid #f5d63d;box-shadow:0 0 40px rgba(245,214,61,0.35);">
+            <img src="cid:ticket-qr" alt="Ticket QR Code" width="240" height="240" style="display:block;width:240px;height:240px;" />
           </div>
-          <p style="margin:14px 0 0 0;font-size:12px;color:#888888;">Scan at the door</p>
+          <p style="margin:18px 0 0 0;font-family:'Bebas Neue','Inter',sans-serif;font-size:14px;color:#f5d63d;letter-spacing:4px;text-transform:uppercase;">Scan At The Door</p>
         </td></tr>
-        <tr><td style="padding:18px 28px 28px 28px;border-top:1px solid #1f1f1f;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#666666;">NoCTRL Events · See you on the dancefloor</p>
+        <tr><td style="padding:22px 32px 28px 32px;border-top:1px solid rgba(245,214,61,0.18);text-align:center;background:rgba(20,19,13,0.5);">
+          <p style="margin:0;font-family:'Bebas Neue','Inter',sans-serif;font-size:13px;color:#bfb38a;letter-spacing:3px;text-transform:uppercase;">NoCTRL · Lose Control</p>
         </td></tr>
       </table>
     </td></tr>
