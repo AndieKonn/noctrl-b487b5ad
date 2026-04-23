@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, AlertTriangle, Loader2, Ticket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ const formatDateTime = (iso: string) => {
 
 export default function Verify() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const ticket = params.get("ticket")?.trim() ?? "";
   const [state, setState] = useState<State>({ kind: "loading" });
 
@@ -50,6 +51,15 @@ export default function Verify() {
     const run = async () => {
       if (!ticket) {
         setState({ kind: "missing" });
+        return;
+      }
+
+      // Door scanning is staff-only — bounce to staff login if not signed in
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess.session) {
+        navigate(`/staff/login?next=${encodeURIComponent(`/verify?ticket=${ticket}`)}`, {
+          replace: true,
+        });
         return;
       }
 
@@ -131,7 +141,7 @@ export default function Verify() {
     return () => {
       cancelled = true;
     };
-  }, [ticket]);
+  }, [ticket, navigate]);
 
   return (
     <main className="min-h-screen bg-background text-foreground px-4 py-8 flex items-start sm:items-center justify-center">

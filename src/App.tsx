@@ -9,6 +9,9 @@ import AdminPortal from "./pages/AdminPortal.tsx";
 import AdminPortalDashboard from "./pages/AdminPortalDashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Verify from "./pages/Verify.tsx";
+import StaffLogin from "./pages/StaffLogin.tsx";
+import StaffScan from "./pages/StaffScan.tsx";
+import RequireStaff from "./components/RequireStaff.tsx";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +31,24 @@ const App = () => {
             <Route path="/admin-portal" element={<AdminPortal />} />
             <Route path="/admin-portal/dashboard" element={<AdminPortalDashboard />} />
             <Route path="/verify" element={<Verify />} />
+            <Route path="/staff/login" element={<StaffLogin />} />
+            <Route
+              path="/staff/scan"
+              element={
+                <RequireStaff>
+                  <StaffScan />
+                </RequireStaff>
+              }
+            />
+            {/* Any other /staff/* path → bounce staff to the scanner */}
+            <Route
+              path="/staff/*"
+              element={
+                <RequireStaff>
+                  <StaffScan />
+                </RequireStaff>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

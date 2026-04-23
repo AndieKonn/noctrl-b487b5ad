@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
-import { LogOut, Calendar, Users, Euro, Plus, Pencil, Trash2, Tag, Copy } from "lucide-react";
+import { LogOut, Calendar, Users, Euro, Plus, Pencil, Trash2, Tag, Copy, ShieldCheck } from "lucide-react";
+import StaffManager from "@/components/admin/StaffManager";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -200,6 +201,10 @@ function Dashboard() {
           <TabsList>
             <TabsTrigger value="events">Events & Guests</TabsTrigger>
             <TabsTrigger value="prcodes">PR Codes</TabsTrigger>
+            <TabsTrigger value="staff">
+              <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+              Door Crew
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="events" className="mt-4">
@@ -215,6 +220,10 @@ function Dashboard() {
 
           <TabsContent value="prcodes" className="mt-4">
             <PrCodesManager codes={prCodes} onChange={load} />
+          </TabsContent>
+
+          <TabsContent value="staff" className="mt-4">
+            <StaffManager />
           </TabsContent>
         </Tabs>
       </main>
