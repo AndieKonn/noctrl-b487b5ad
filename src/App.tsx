@@ -8,6 +8,7 @@ import Index from "./pages/Index.tsx";
 import AdminPortal from "./pages/AdminPortal.tsx";
 import AdminPortalDashboard from "./pages/AdminPortalDashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import Verify from "./pages/Verify.tsx";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/admin-portal" element={<AdminPortal />} />
             <Route path="/admin-portal/dashboard" element={<AdminPortalDashboard />} />
+            <Route path="/verify" element={<Verify />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
