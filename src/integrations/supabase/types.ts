@@ -203,7 +203,7 @@ export type Database = {
       validate_pr_code: { Args: { _code: string }; Returns: string }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "staff"
       booking_tier: "standard" | "vip" | "entrance"
       payment_status: "pending" | "paid" | "cancelled"
     }
@@ -333,7 +333,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "staff"],
       booking_tier: ["standard", "vip", "entrance"],
       payment_status: ["pending", "paid", "cancelled"],
     },
