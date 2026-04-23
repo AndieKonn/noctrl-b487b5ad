@@ -1,0 +1,1 @@
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS qr_code_data_url text;

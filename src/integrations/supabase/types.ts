@@ -27,6 +27,7 @@ export type Database = {
           phone: string
           pr_code: string | null
           price_eur: number
+          qr_code_data_url: string | null
           ticket_code: string | null
           tier: Database["public"]["Enums"]["booking_tier"]
           updated_at: string
@@ -43,6 +44,7 @@ export type Database = {
           phone: string
           pr_code?: string | null
           price_eur: number
+          qr_code_data_url?: string | null
           ticket_code?: string | null
           tier: Database["public"]["Enums"]["booking_tier"]
           updated_at?: string
@@ -59,6 +61,7 @@ export type Database = {
           phone?: string
           pr_code?: string | null
           price_eur?: number
+          qr_code_data_url?: string | null
           ticket_code?: string | null
           tier?: Database["public"]["Enums"]["booking_tier"]
           updated_at?: string
