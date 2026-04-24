@@ -94,18 +94,34 @@ export default function StaffScan() {
 
     setProcessing(true);
     try {
-      const { data: booking, error } = await supabase
+      // Look up the ticket row
+      const { data: tk, error: tkErr } = await supabase
+        .from("tickets")
+        .select("id, ticket_code, used_at, booking_id")
+        .eq("ticket_code", code)
+        .maybeSingle();
+
+      if (tkErr || !tk) {
+        setResult({ kind: "invalid", raw: code });
+        return;
+      }
+
+      const { data: booking } = await supabase
         .from("bookings")
         .select(
           "id, ticket_code, full_name, tier, number_of_guests, payment_status, used_at, event_id",
         )
-        .eq("ticket_code", code)
+        .eq("id", tk.booking_id)
         .maybeSingle();
 
-      if (error || !booking) {
+      if (!booking) {
         setResult({ kind: "invalid", raw: code });
         return;
       }
+
+      // Use the ticket's code (the one actually scanned) so the result card
+      // shows the right code in multi-ticket bookings.
+      const bookingForResult: Booking = { ...booking, ticket_code: tk.ticket_code, used_at: tk.used_at };
 
       let eventTitle = "NoCTRL Event";
       if (booking.event_id) {
@@ -118,19 +134,19 @@ export default function StaffScan() {
       }
 
       if (booking.payment_status !== "paid") {
-        setResult({ kind: "unpaid", booking });
+        setResult({ kind: "unpaid", booking: bookingForResult });
         return;
       }
-      if (booking.used_at) {
-        setResult({ kind: "used", booking, eventTitle });
+      if (tk.used_at) {
+        setResult({ kind: "used", booking: bookingForResult, eventTitle });
         return;
       }
 
       const nowIso = new Date().toISOString();
       const { data: updated, error: updErr } = await supabase
-        .from("bookings")
+        .from("tickets")
         .update({ used_at: nowIso })
-        .eq("ticket_code", code)
+        .eq("id", tk.id)
         .is("used_at", null)
         .select("used_at")
         .maybeSingle();
@@ -138,20 +154,25 @@ export default function StaffScan() {
       if (updErr || !updated) {
         // Lost a race — re-fetch to show "already scanned"
         const { data: re } = await supabase
-          .from("bookings")
-          .select(
-            "id, ticket_code, full_name, tier, number_of_guests, payment_status, used_at, event_id",
-          )
-          .eq("ticket_code", code)
+          .from("tickets")
+          .select("id, ticket_code, used_at, booking_id")
+          .eq("id", tk.id)
           .maybeSingle();
-        if (re?.used_at) setResult({ kind: "used", booking: re, eventTitle });
-        else setResult({ kind: "invalid", raw: code });
+        if (re?.used_at) {
+          setResult({
+            kind: "used",
+            booking: { ...bookingForResult, used_at: re.used_at },
+            eventTitle,
+          });
+        } else {
+          setResult({ kind: "invalid", raw: code });
+        }
         return;
       }
 
       setResult({
         kind: "valid",
-        booking: { ...booking, used_at: updated.used_at },
+        booking: { ...bookingForResult, used_at: updated.used_at },
         eventTitle,
         scannedAt: updated.used_at ?? nowIso,
       });
