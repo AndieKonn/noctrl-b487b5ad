@@ -166,6 +166,41 @@ export type Database = {
         }
         Relationships: []
       }
+      tickets: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          qr_code_data_url: string | null
+          ticket_code: string
+          used_at: string | null
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          qr_code_data_url?: string | null
+          ticket_code: string
+          used_at?: string | null
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          qr_code_data_url?: string | null
+          ticket_code?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
