@@ -730,8 +730,13 @@ export default function Index() {
               {selected && event && (
                 <>
                   <strong className="text-foreground">{selected.name}</strong> for{" "}
-                  <strong className="text-foreground">{event.title}</strong> — €{selected.price}
-                  {!isEntrance && ` · ${guests} guest${guests === "1" ? "" : "s"}`}
+                  <strong className="text-foreground">{event.title}</strong> — €
+                  {isEntrance
+                    ? selected.price * Math.max(1, parseInt(guests, 10) || 1)
+                    : selected.price}
+                  {isEntrance
+                    ? ` · ${guests} ticket${guests === "1" ? "" : "s"}`
+                    : ` · ${guests} guest${guests === "1" ? "" : "s"}`}
                 </>
               )}
             </AlertDialogDescription>
@@ -742,6 +747,56 @@ export default function Index() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" /> Verify your email
+            </DialogTitle>
+            <DialogDescription>
+              We sent a 6-digit code to{" "}
+              <span className="text-foreground">{email.trim().toLowerCase()}</span>. Enter
+              it below to continue. The code expires in 10 minutes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label htmlFor="verify-code">Verification code</Label>
+            <Input
+              id="verify-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={verifyCode}
+              onChange={(e) =>
+                setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              placeholder="123456"
+              className="text-center font-mono text-2xl tracking-[0.5em]"
+            />
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={verifySending}
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60"
+            >
+              {verifySending ? "Sending..." : "Resend code"}
+            </button>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setVerifyOpen(false)}
+              disabled={verifying}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleVerifyCode} disabled={verifying || verifyCode.length !== 6}>
+              {verifying ? "Verifying..." : "Verify & continue"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!issuedTicket} onOpenChange={(o) => !o && setIssuedTicket(null)}>
         <DialogContent className="sm:max-w-md">
