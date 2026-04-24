@@ -1,3 +1,8 @@
+// Stripe checkout creator. Looks up a booking, plus its child tickets,
+// and creates a checkout session priced at (per-ticket price × ticket count).
+// Reservations always have 1 ticket (the whole party). Entrance bookings
+// can have N tickets (one per individual entry).
+
 import Stripe from "https://esm.sh/stripe@17.7.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -40,11 +45,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Look up booking server-side using the service role; never trust client price/email
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
-      .select("ticket_code, email, price_eur, number_of_guests, tier, payment_status, event_id")
+      .select(
+        "id, ticket_code, email, price_eur, number_of_guests, tier, payment_status, event_id",
+      )
       .eq("ticket_code", ticketCode)
       .maybeSingle();
 
@@ -62,9 +68,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Resolve canonical event title and price from the events table
     let eventTitle = "NoCTRL Event";
-    let canonicalPrice = Number(booking.price_eur);
+    let perTicketPrice = Number(booking.price_eur);
     if (booking.event_id) {
       const { data: ev } = await supabase
         .from("events")
@@ -73,7 +78,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (ev) {
         eventTitle = ev.title;
-        canonicalPrice = booking.tier === "entrance"
+        perTicketPrice = booking.tier === "entrance"
           ? Number(ev.price_entrance)
           : booking.tier === "vip"
           ? Number(ev.price_vip)
@@ -81,18 +86,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!Number.isFinite(canonicalPrice) || canonicalPrice <= 0) {
+    if (!Number.isFinite(perTicketPrice) || perTicketPrice <= 0) {
       return new Response(JSON.stringify({ error: "Invalid booking price" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const tierName = booking.tier === "entrance"
+    // Reservations: 1 line item for the whole party (price already covers party).
+    // Entrance: charge per individual ticket — quantity = number_of_guests.
+    const isEntrance = booking.tier === "entrance";
+    const quantity = isEntrance ? Math.max(1, booking.number_of_guests) : 1;
+
+    const tierName = isEntrance
       ? "Entrance Ticket"
       : booking.tier === "vip"
       ? "VIP Reservation"
       : "Standard Reservation";
+
+    const productName = isEntrance
+      ? `${eventTitle} — Entrance Ticket`
+      : `${eventTitle} — ${tierName} (${booking.number_of_guests} guests)`;
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2024-11-20.acacia" });
 
@@ -102,13 +116,11 @@ Deno.serve(async (req) => {
       customer_email: booking.email,
       line_items: [
         {
-          quantity: 1,
+          quantity,
           price_data: {
             currency: "eur",
-            unit_amount: Math.round(canonicalPrice * 100),
-            product_data: {
-              name: `${eventTitle} — ${tierName} (${booking.number_of_guests} guests)`,
-            },
+            unit_amount: Math.round(perTicketPrice * 100),
+            product_data: { name: productName },
           },
         },
       ],

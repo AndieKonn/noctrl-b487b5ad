@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 
 type Booking = {
   id: string;
-  ticket_code: string;
   full_name: string;
   email: string;
   tier: "standard" | "vip" | "entrance";
@@ -14,16 +13,33 @@ type Booking = {
   event_date: string;
   event_id: string | null;
   payment_status: "pending" | "paid" | "cancelled";
+};
+
+type TicketRow = {
+  id: string;
+  ticket_code: string;
   used_at: string | null;
+  booking_id: string;
 };
 
 type State =
   | { kind: "loading" }
   | { kind: "missing" }
   | { kind: "invalid" }
-  | { kind: "unpaid"; booking: Booking }
-  | { kind: "valid"; booking: Booking; eventTitle: string; scannedNow: boolean }
-  | { kind: "used"; booking: Booking; eventTitle: string };
+  | { kind: "unpaid"; booking: Booking; ticket: TicketRow }
+  | {
+      kind: "valid";
+      booking: Booking;
+      ticket: TicketRow;
+      eventTitle: string;
+      scannedAt: string;
+    }
+  | {
+      kind: "used";
+      booking: Booking;
+      ticket: TicketRow;
+      eventTitle: string;
+    };
 
 const tierLabel = (tier: Booking["tier"]) =>
   tier === "entrance" ? "Entrance" : tier === "vip" ? "VIP" : "Standard";
@@ -54,7 +70,6 @@ export default function Verify() {
         return;
       }
 
-      // Door scanning is staff-only — bounce to staff login if not signed in
       const { data: sess } = await supabase.auth.getSession();
       if (!sess.session) {
         navigate(`/staff/login?next=${encodeURIComponent(`/verify?ticket=${ticket}`)}`, {
@@ -63,17 +78,29 @@ export default function Verify() {
         return;
       }
 
-      const { data: booking, error } = await supabase
-        .from("bookings")
-        .select(
-          "id, ticket_code, full_name, email, tier, number_of_guests, event_date, event_id, payment_status, used_at",
-        )
+      // Look up the ticket row
+      const { data: tk, error: tkErr } = await supabase
+        .from("tickets")
+        .select("id, ticket_code, used_at, booking_id")
         .eq("ticket_code", ticket)
         .maybeSingle();
 
       if (cancelled) return;
+      if (tkErr || !tk) {
+        setState({ kind: "invalid" });
+        return;
+      }
 
-      if (error || !booking) {
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select(
+          "id, full_name, email, tier, number_of_guests, event_date, event_id, payment_status",
+        )
+        .eq("id", tk.booking_id)
+        .maybeSingle();
+
+      if (cancelled) return;
+      if (!booking) {
         setState({ kind: "invalid" });
         return;
       }
@@ -90,21 +117,19 @@ export default function Verify() {
       if (cancelled) return;
 
       if (booking.payment_status !== "paid") {
-        setState({ kind: "unpaid", booking });
+        setState({ kind: "unpaid", booking, ticket: tk });
+        return;
+      }
+      if (tk.used_at) {
+        setState({ kind: "used", booking, ticket: tk, eventTitle });
         return;
       }
 
-      if (booking.used_at) {
-        setState({ kind: "used", booking, eventTitle });
-        return;
-      }
-
-      // Mark as used — RLS enforces "only when used_at is null"
       const nowIso = new Date().toISOString();
       const { data: updated, error: updateErr } = await supabase
-        .from("bookings")
+        .from("tickets")
         .update({ used_at: nowIso })
-        .eq("ticket_code", ticket)
+        .eq("id", tk.id)
         .is("used_at", null)
         .select("used_at")
         .maybeSingle();
@@ -112,17 +137,14 @@ export default function Verify() {
       if (cancelled) return;
 
       if (updateErr || !updated) {
-        // Race: someone else stamped it just now — re-fetch to show the used state
-        const { data: refetched } = await supabase
-          .from("bookings")
-          .select(
-            "id, ticket_code, full_name, email, tier, number_of_guests, event_date, event_id, payment_status, used_at",
-          )
-          .eq("ticket_code", ticket)
+        const { data: re } = await supabase
+          .from("tickets")
+          .select("id, ticket_code, used_at, booking_id")
+          .eq("id", tk.id)
           .maybeSingle();
         if (cancelled) return;
-        if (refetched?.used_at) {
-          setState({ kind: "used", booking: refetched, eventTitle });
+        if (re?.used_at) {
+          setState({ kind: "used", booking, ticket: re, eventTitle });
         } else {
           setState({ kind: "invalid" });
         }
@@ -131,9 +153,10 @@ export default function Verify() {
 
       setState({
         kind: "valid",
-        booking: { ...booking, used_at: updated.used_at },
+        booking,
+        ticket: { ...tk, used_at: updated.used_at },
         eventTitle,
-        scannedNow: true,
+        scannedAt: updated.used_at ?? nowIso,
       });
     };
 
@@ -196,7 +219,6 @@ export default function Verify() {
                 ["Name", state.booking.full_name],
                 ["Tier", tierLabel(state.booking.tier)],
                 ["Guests", String(state.booking.number_of_guests)],
-                ["Code", state.booking.ticket_code],
               ]}
             />
           </StatusCard>
@@ -207,7 +229,7 @@ export default function Verify() {
             tone="error"
             icon={<XCircle className="h-10 w-10" />}
             title="Already scanned"
-            subtitle={`This ticket was used on ${formatDateTime(state.booking.used_at!)}.`}
+            subtitle={`This ticket was used on ${formatDateTime(state.ticket.used_at!)}.`}
           >
             <DetailGrid
               rows={[
@@ -215,7 +237,6 @@ export default function Verify() {
                 ["Name", state.booking.full_name],
                 ["Tier", tierLabel(state.booking.tier)],
                 ["Guests", String(state.booking.number_of_guests)],
-                ["Code", state.booking.ticket_code],
               ]}
             />
           </StatusCard>
@@ -226,7 +247,7 @@ export default function Verify() {
             tone="success"
             icon={<CheckCircle2 className="h-10 w-10" />}
             title="Valid ticket — admit"
-            subtitle={`Scanned ${formatDateTime(state.booking.used_at!)}`}
+            subtitle={`Scanned ${formatDateTime(state.scannedAt)}`}
           >
             <DetailGrid
               rows={[
@@ -234,7 +255,6 @@ export default function Verify() {
                 ["Name", state.booking.full_name],
                 ["Tier", tierLabel(state.booking.tier)],
                 ["Guests", String(state.booking.number_of_guests)],
-                ["Code", state.booking.ticket_code],
               ]}
             />
           </StatusCard>
