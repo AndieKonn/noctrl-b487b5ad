@@ -1,3 +1,10 @@
+// Stripe webhook. On successful payment:
+//  - mark the booking as paid
+//  - generate N ticket rows (1 for reservations, N for entrance) with their
+//    own QR codes
+//  - email all QR codes to the buyer (one big confirmation email with each
+//    QR inline)
+
 import Stripe from "https://esm.sh/stripe@17.7.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import QRCode from "https://esm.sh/qrcode@1.5.4";
@@ -8,14 +15,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, stripe-signature",
 };
 
+const VERIFY_BASE = "https://noctrl.lovable.app/verify";
+
+function generateTicketCode() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => (b % 10).toString()).join("");
+}
+
 function buildEmailHtml(opts: {
   fullName: string;
   eventTitle: string;
   tier: string;
   guests: number;
-  ticketCode: string;
+  ticketCount: number;
   eventDate: string | null;
-  qrDataUrl: string;
+  ticketCodes: string[];
 }) {
   const tierLabel = opts.tier === "entrance"
     ? "Entrance Ticket"
@@ -25,7 +40,30 @@ function buildEmailHtml(opts: {
   const dateLine = opts.eventDate
     ? `<tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Date</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${opts.eventDate}</td></tr>`
     : "";
-  // NoCTRL palette — black background, golden-yellow accents (HSL 50 95% 60% ≈ #f5d63d)
+
+  const qrBlocks = opts.ticketCodes
+    .map((code, i) => {
+      const cid = `ticket-qr-${i}`;
+      const labelLine = opts.ticketCount > 1
+        ? `<p style="margin:14px 0 4px 0;font-family:'Bebas Neue','Inter',sans-serif;font-size:14px;color:#f5d63d;letter-spacing:4px;text-transform:uppercase;">Ticket ${i + 1} of ${opts.ticketCount}</p>`
+        : `<p style="margin:18px 0 0 0;font-family:'Bebas Neue','Inter',sans-serif;font-size:14px;color:#f5d63d;letter-spacing:4px;text-transform:uppercase;">Scan At The Door</p>`;
+      return `
+      <tr><td align="center" style="padding:8px 32px 24px 32px;">
+        <div style="background:#f7f3e3;display:inline-block;padding:18px;border-radius:14px;border:2px solid #f5d63d;box-shadow:0 0 40px rgba(245,214,61,0.35);">
+          <img src="cid:${cid}" alt="Ticket QR Code" width="240" height="240" style="display:block;width:240px;height:240px;" />
+        </div>
+        ${labelLine}
+        <p style="margin:6px 0 0 0;font-family:'Courier New',monospace;font-size:12px;color:#bfb38a;letter-spacing:1px;">${code}</p>
+      </td></tr>`;
+    })
+    .join("");
+
+  const intro = opts.ticketCount > 1
+    ? `Payment confirmed for <span style="color:#f5d63d;font-weight:700;">${opts.eventTitle}</span>.
+       You bought ${opts.ticketCount} entrance tickets — each ticket below can be used by one person at the door. Show one QR per person.`
+    : `Payment confirmed for <span style="color:#f5d63d;font-weight:700;">${opts.eventTitle}</span>.
+       Flash the QR below at the door — that's your ticket in.`;
+
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#16150f;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#f7f3e3;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#16150f;background-image:radial-gradient(ellipse at top, rgba(245,214,61,0.18), transparent 60%),radial-gradient(ellipse at bottom right, rgba(232,184,42,0.12), transparent 60%);padding:40px 16px;">
@@ -37,23 +75,14 @@ function buildEmailHtml(opts: {
         </td></tr>
         <tr><td style="padding:28px 32px 8px 32px;">
           <p style="margin:0 0 14px 0;font-size:16px;color:#f7f3e3;line-height:1.5;">Hey ${opts.fullName},</p>
-          <p style="margin:0 0 24px 0;font-size:15px;color:#d8d2b8;line-height:1.65;">
-            Payment confirmed for <span style="color:#f5d63d;font-weight:700;">${opts.eventTitle}</span>.
-            Flash the QR below at the door — that's your ticket in.
-          </p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#d8d2b8;line-height:1.65;">${intro}</p>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(20,19,13,0.7);border:1px solid rgba(245,214,61,0.2);border-radius:12px;padding:18px 20px;margin:0 0 24px 0;">
             <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Tier</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${tierLabel}</td></tr>
-            <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Guests</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${opts.guests}</td></tr>
+            <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">${opts.tier === "entrance" ? "Tickets" : "Guests"}</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${opts.guests}</td></tr>
             ${dateLine}
-            <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Ticket Code</td><td style="padding:8px 0;color:#f5d63d;text-align:right;font-weight:700;font-family:'Courier New',monospace;font-size:15px;letter-spacing:1px;">${opts.ticketCode}</td></tr>
           </table>
         </td></tr>
-        <tr><td align="center" style="padding:8px 32px 32px 32px;">
-          <div style="background:#f7f3e3;display:inline-block;padding:18px;border-radius:14px;border:2px solid #f5d63d;box-shadow:0 0 40px rgba(245,214,61,0.35);">
-            <img src="cid:ticket-qr" alt="Ticket QR Code" width="240" height="240" style="display:block;width:240px;height:240px;" />
-          </div>
-          <p style="margin:18px 0 0 0;font-family:'Bebas Neue','Inter',sans-serif;font-size:14px;color:#f5d63d;letter-spacing:4px;text-transform:uppercase;">Scan At The Door</p>
-        </td></tr>
+        ${qrBlocks}
         <tr><td style="padding:22px 32px 28px 32px;border-top:1px solid rgba(245,214,61,0.18);text-align:center;background:rgba(20,19,13,0.5);">
           <p style="margin:0;font-family:'Bebas Neue','Inter',sans-serif;font-size:13px;color:#bfb38a;letter-spacing:3px;text-transform:uppercase;">NoCTRL · Lose Control</p>
         </td></tr>
@@ -121,10 +150,11 @@ Deno.serve(async (req) => {
         session.payment_status === "no_payment_required";
 
       if (ticketCode && paid) {
-        // Load booking + event details
         const { data: booking, error: fetchErr } = await supabase
           .from("bookings")
-          .select("id, ticket_code, full_name, email, tier, number_of_guests, event_date, event_id, payment_status")
+          .select(
+            "id, ticket_code, full_name, email, tier, number_of_guests, event_date, event_id, payment_status",
+          )
           .eq("ticket_code", ticketCode)
           .maybeSingle();
 
@@ -146,24 +176,68 @@ Deno.serve(async (req) => {
           if (ev?.title) eventTitle = ev.title;
         }
 
-        // Generate QR code (encodes ticket code + verification URL)
-        const origin = new URL(req.url).origin;
-        const verifyUrl = `https://noctrl.lovable.app/verify?ticket=${encodeURIComponent(ticketCode)}`;
-        const qrPayload = JSON.stringify({ ticket: ticketCode, verify: verifyUrl });
+        // How many QR codes does this buyer get?
+        // - reservations: 1 (whole party)
+        // - entrance: N (one per individual ticket)
+        const isEntrance = booking.tier === "entrance";
+        const ticketCount = isEntrance ? Math.max(1, booking.number_of_guests) : 1;
 
-        const qrDataUrl: string = await QRCode.toDataURL(qrPayload, {
-          errorCorrectionLevel: "M",
-          margin: 1,
-          width: 512,
-          color: { dark: "#000000", light: "#FFFFFF" },
-        });
+        // Make sure we don't double-create on webhook retry
+        const { data: existing } = await supabase
+          .from("tickets")
+          .select("ticket_code, qr_code_data_url")
+          .eq("booking_id", booking.id)
+          .order("created_at", { ascending: true });
 
-        // Update booking: paid + store QR
+        let ticketRows: { ticket_code: string; qr_code_data_url: string }[];
+        if (existing && existing.length === ticketCount) {
+          ticketRows = existing as { ticket_code: string; qr_code_data_url: string }[];
+        } else {
+          // Generate fresh codes + QRs. Reuse the booking's primary ticket_code as
+          // the first one so /verify links from earlier flows still resolve.
+          const codes: string[] = [];
+          for (let i = 0; i < ticketCount; i++) {
+            codes.push(i === 0 ? booking.ticket_code! : generateTicketCode());
+          }
+
+          const inserts = await Promise.all(
+            codes.map(async (code) => {
+              const verifyUrl = `${VERIFY_BASE}?ticket=${encodeURIComponent(code)}`;
+              const qrPayload = JSON.stringify({ ticket: code, verify: verifyUrl });
+              const qrDataUrl: string = await QRCode.toDataURL(qrPayload, {
+                errorCorrectionLevel: "M",
+                margin: 1,
+                width: 512,
+                color: { dark: "#000000", light: "#FFFFFF" },
+              });
+              return { booking_id: booking.id, ticket_code: code, qr_code_data_url: qrDataUrl };
+            }),
+          );
+
+          // Replace any partial set so we end up with exactly `ticketCount` rows
+          if (existing && existing.length > 0) {
+            await supabase.from("tickets").delete().eq("booking_id", booking.id);
+          }
+          const { error: insertErr } = await supabase.from("tickets").insert(inserts);
+          if (insertErr) {
+            console.error("Insert tickets failed", insertErr);
+            return new Response(JSON.stringify({ error: "DB insert failed" }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          ticketRows = inserts.map((r) => ({
+            ticket_code: r.ticket_code,
+            qr_code_data_url: r.qr_code_data_url,
+          }));
+        }
+
+        // Update booking: paid + cache the FIRST QR for back-compat
         const { error: updateErr } = await supabase
           .from("bookings")
           .update({
             payment_status: "paid",
-            qr_code_data_url: qrDataUrl,
+            qr_code_data_url: ticketRows[0]?.qr_code_data_url ?? null,
           })
           .eq("ticket_code", ticketCode);
 
@@ -175,19 +249,27 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Send confirmation email via Resend
         if (resendKey) {
           try {
-            const base64Png = qrDataUrl.split(",")[1] ?? "";
             const html = buildEmailHtml({
               fullName: booking.full_name,
               eventTitle,
               tier: booking.tier,
               guests: booking.number_of_guests,
-              ticketCode,
+              ticketCount,
               eventDate: booking.event_date,
-              qrDataUrl,
+              ticketCodes: ticketRows.map((t) => t.ticket_code),
             });
+
+            const attachments = ticketRows.map((t, i) => ({
+              filename: `ticket-${t.ticket_code}.png`,
+              content: t.qr_code_data_url.split(",")[1] ?? "",
+              content_id: `ticket-qr-${i}`,
+            }));
+
+            const subject = ticketCount > 1
+              ? `Your ${ticketCount} tickets for ${eventTitle} 🎟️`
+              : `Your ticket for ${eventTitle} 🎟️`;
 
             const emailRes = await fetch("https://api.resend.com/emails", {
               method: "POST",
@@ -198,15 +280,9 @@ Deno.serve(async (req) => {
               body: JSON.stringify({
                 from: "NoCTRL <onboarding@resend.dev>",
                 to: [booking.email],
-                subject: `Your ticket for ${eventTitle} 🎟️`,
+                subject,
                 html,
-                attachments: [
-                  {
-                    filename: `ticket-${ticketCode}.png`,
-                    content: base64Png,
-                    content_id: "ticket-qr",
-                  },
-                ],
+                attachments,
               }),
             });
 
