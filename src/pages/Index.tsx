@@ -559,12 +559,17 @@ export default function Index() {
             <h3 className="font-display text-3xl tracking-wide">Your details</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               You selected <span className="text-foreground">{selected?.name}</span> — €
-              {selected?.price}
+              {selected ? (isEntrance ? selected.price * Math.max(1, parseInt(guests, 10) || 1) : selected.price) : 0}
+              {isEntrance && parseInt(guests, 10) > 1 && (
+                <span className="text-xs"> ({guests} × €{selected?.price})</span>
+              )}
             </p>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <Label htmlFor="fullName">Full name</Label>
+                <Label htmlFor="fullName">
+                  Full name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="fullName"
                   required
@@ -575,7 +580,9 @@ export default function Index() {
                 />
               </div>
               <div>
-                <Label htmlFor="phone">Phone number</Label>
+                <Label htmlFor="phone">
+                  Phone number <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -594,7 +601,9 @@ export default function Index() {
                 )}
               </div>
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">
+                  Email <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -602,6 +611,10 @@ export default function Index() {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
+                    // Changing email invalidates a previous verification
+                    if (verifiedEmail && e.target.value.trim().toLowerCase() !== verifiedEmail) {
+                      setVerifiedEmail(null);
+                    }
                     if (errors.email) setErrors({ ...errors, email: undefined });
                   }}
                   placeholder="you@example.com"
@@ -612,22 +625,28 @@ export default function Index() {
                   <p className="mt-1 text-xs text-destructive">{errors.email}</p>
                 )}
               </div>
-              {!isEntrance && (
-                <div>
-                  <Label htmlFor="guests">Number of people</Label>
-                  <Input
-                    id="guests"
-                    type="number"
-                    min={1}
-                    max={50}
-                    required
-                    value={guests}
-                    onChange={(e) => setGuests(e.target.value)}
-                    className="mt-1.5"
-                  />
-                </div>
-              )}
-              <div className={isEntrance ? "md:col-span-2" : ""}>
+              <div>
+                <Label htmlFor="guests">
+                  {isEntrance ? "Number of tickets" : "Number of people"}{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="guests"
+                  type="number"
+                  min={1}
+                  max={50}
+                  required
+                  value={guests}
+                  onChange={(e) => setGuests(e.target.value)}
+                  className="mt-1.5"
+                />
+                {isEntrance && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    You'll receive one QR code per ticket.
+                  </p>
+                )}
+              </div>
+              <div>
                 <Label htmlFor="prCode">PR Code (optional)</Label>
                 <Input
                   id="prCode"
@@ -651,7 +670,8 @@ export default function Index() {
               />
               <div className="flex-1">
                 <Label htmlFor="age" className="cursor-pointer text-sm font-normal leading-snug">
-                  I confirm that I am 17 years old or older.
+                  I confirm that I am 17 years old or older.{" "}
+                  <span className="text-destructive">*</span>
                 </Label>
                 {errors.age && (
                   <p className="mt-1 text-xs text-destructive">{errors.age}</p>
@@ -676,17 +696,23 @@ export default function Index() {
             <Button
               type="submit"
               size="lg"
-              disabled={submitting || soldOut}
+              disabled={submitting || verifySending || soldOut}
               className="mt-6 w-full bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90"
             >
               {submitting
                 ? "Redirecting to payment..."
-                : soldOut
-                  ? "Sold out"
-                  : `Book & Pay — €${selected?.price}`}
+                : verifySending
+                  ? "Sending verification email..."
+                  : soldOut
+                    ? "Sold out"
+                    : verifiedEmail === email.trim().toLowerCase()
+                      ? `Book & Pay — €${selected ? (isEntrance ? selected.price * Math.max(1, parseInt(guests, 10) || 1) : selected.price) : 0}`
+                      : "Verify email & continue"}
             </Button>
             <p className="mt-3 text-center text-xs text-muted-foreground">
-              You'll be redirected to Stripe to complete payment securely.
+              {verifiedEmail === email.trim().toLowerCase()
+                ? "You'll be redirected to Stripe to complete payment securely."
+                : "We'll send a 6-digit code to your email to confirm it before payment."}
             </p>
           </form>
         </section>
