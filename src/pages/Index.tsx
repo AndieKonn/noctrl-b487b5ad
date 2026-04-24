@@ -221,7 +221,7 @@ export default function Index() {
     return Object.keys(next).length === 0;
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!event || !selected) return;
     if (soldOut) {
@@ -229,7 +229,62 @@ export default function Index() {
       return;
     }
     if (!validate()) return;
+
+    // If the email isn't verified yet, kick off verification first.
+    const cleanEmail = email.trim().toLowerCase();
+    if (verifiedEmail !== cleanEmail) {
+      setVerifySending(true);
+      const { error: sendErr } = await supabase.functions.invoke(
+        "send-email-verification",
+        { body: { email: cleanEmail } },
+      );
+      setVerifySending(false);
+      if (sendErr) {
+        toast.error("Couldn't send verification email. Please try again.");
+        return;
+      }
+      setVerifyCode("");
+      setVerifyOpen(true);
+      toast.success("We sent a 6-digit code to your email.");
+      return;
+    }
+
     setConfirmOpen(true);
+  };
+
+  const handleVerifyCode = async () => {
+    if (!/^\d{6}$/.test(verifyCode.trim())) {
+      toast.error("Enter the 6-digit code from your email.");
+      return;
+    }
+    setVerifying(true);
+    const cleanEmail = email.trim().toLowerCase();
+    const { data, error } = await supabase.functions.invoke("verify-email-code", {
+      body: { email: cleanEmail, code: verifyCode.trim() },
+    });
+    setVerifying(false);
+
+    const errMsg = (data as { error?: string })?.error;
+    if (error || errMsg) {
+      toast.error(errMsg ?? error?.message ?? "Verification failed");
+      return;
+    }
+    setVerifiedEmail(cleanEmail);
+    setVerifyOpen(false);
+    toast.success("Email verified — review and confirm your booking.");
+    setConfirmOpen(true);
+  };
+
+  const handleResendCode = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    setVerifySending(true);
+    const { error: sendErr } = await supabase.functions.invoke(
+      "send-email-verification",
+      { body: { email: cleanEmail } },
+    );
+    setVerifySending(false);
+    if (sendErr) toast.error("Couldn't resend code.");
+    else toast.success("New code sent.");
   };
 
   const handleConfirmedBooking = async () => {
@@ -250,16 +305,17 @@ export default function Index() {
     }
 
     const ticketCode = generateTicketCode();
+    const quantity = isEntrance ? Math.max(1, parseInt(guests, 10)) : parseInt(guests, 10);
 
     const { error } = await supabase.from("bookings").insert({
       full_name: fullName,
       phone,
       email,
-      number_of_guests: isEntrance ? 1 : parseInt(guests, 10),
+      number_of_guests: quantity,
       event_date: event.event_date ?? new Date().toISOString().slice(0, 10),
       event_id: event.id,
       tier,
-      price_eur: selected.price,
+      price_eur: selected.price * (isEntrance ? quantity : 1),
       pr_code: validatedCode,
       ticket_code: ticketCode,
       payment_status: "pending",
@@ -272,14 +328,13 @@ export default function Index() {
     }
 
     const update = isEntrance
-      ? { tickets_remaining: Math.max(0, event.tickets_remaining - 1) }
-      : { reservations_remaining: Math.max(0, event.reservations_remaining - 1) };
+      ? { tickets_remaining: Math.max(0, event.tickets_remaining - quantity) }
+      : { reservations_remaining: Math.max(0, event.reservations_remaining - quantity) };
     await supabase.from("events").update(update).eq("id", event.id);
     setEvents((prev) =>
       prev.map((ev) => (ev.id === event.id ? ({ ...ev, ...update } as ActiveEvent) : ev))
     );
 
-    const quantity = isEntrance ? 1 : parseInt(guests, 10);
     const origin = window.location.origin;
 
     const { data: checkout, error: fnError } = await supabase.functions.invoke(
