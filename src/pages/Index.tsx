@@ -88,6 +88,13 @@ export default function Index() {
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
   const [successTicketCode, setSuccessTicketCode] = useState<string | null>(null);
 
+  // Email verification
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifySending, setVerifySending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const payment = params.get("payment");
