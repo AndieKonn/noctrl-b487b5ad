@@ -469,7 +469,7 @@ function EventsManager({
                     {count} guest{count !== 1 ? "s" : ""} booked
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setViewingEventId(e.id)}>
+                    <Button size="sm" onClick={() => onOpenList(e.id)}>
                       <Users className="mr-1 h-3 w-3" /> View Guests
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => startEdit(e)}>
