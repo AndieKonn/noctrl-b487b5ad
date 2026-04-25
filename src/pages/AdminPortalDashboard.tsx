@@ -117,31 +117,6 @@ function Dashboard() {
     })();
   }, [navigate, load]);
 
-  const handleDeleteBooking = async (id: string) => {
-    const { error } = await supabase.from("bookings").delete().eq("id", id);
-    if (error) {
-      toast.error("Delete failed: " + error.message);
-      return;
-    }
-    setBookings((prev) => prev.filter((b) => b.id !== id));
-    toast.success("Booking deleted");
-  };
-
-  const handleStatusChange = async (id: string, status: Booking["payment_status"]) => {
-    const { error } = await supabase
-      .from("bookings")
-      .update({ payment_status: status })
-      .eq("id", id);
-    if (error) {
-      toast.error("Update failed");
-      return;
-    }
-    setBookings((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, payment_status: status } : b))
-    );
-    toast.success("Updated");
-  };
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate("/admin-portal");
@@ -155,10 +130,9 @@ function Dashboard() {
     );
   }
 
-  const totalRevenue = bookings
-    .filter((b) => b.payment_status === "paid")
-    .reduce((sum, b) => sum + Number(b.price_eur), 0);
-  const totalGuests = bookings.reduce((sum, b) => sum + b.number_of_guests, 0);
+  const paidBookings = bookings.filter((b) => b.payment_status === "paid");
+  const totalRevenue = paidBookings.reduce((sum, b) => sum + Number(b.price_eur), 0);
+  const totalGuests = paidBookings.reduce((sum, b) => sum + b.number_of_guests, 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -167,22 +141,31 @@ function Dashboard() {
           <div>
             <h1 className="font-display text-2xl tracking-wide">Admin Dashboard</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            <LogOut className="mr-2 h-4 w-4" /> Sign out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => navigate("/list")}
+            >
+              <ListChecks className="mr-2 h-4 w-4" /> Guest List
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" /> Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6 grid gap-4 md:grid-cols-3">
-          <StatCard icon={<Calendar />} label="Total bookings" value={bookings.length.toString()} />
-          <StatCard icon={<Users />} label="Total guests" value={totalGuests.toString()} />
+          <StatCard icon={<Calendar />} label="Paid bookings" value={paidBookings.length.toString()} />
+          <StatCard icon={<Users />} label="Confirmed guests" value={totalGuests.toString()} />
           <StatCard icon={<Euro />} label="Paid revenue" value={`€${totalRevenue.toFixed(2)}`} />
         </div>
 
         <Tabs defaultValue="events" className="w-full">
           <TabsList>
-            <TabsTrigger value="events">Events & Guests</TabsTrigger>
+            <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="prcodes">PR Codes</TabsTrigger>
             <TabsTrigger value="staff">
               <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
@@ -193,11 +176,10 @@ function Dashboard() {
           <TabsContent value="events" className="mt-4">
             <EventsManager
               events={events}
-              bookings={bookings}
+              bookings={paidBookings}
               loading={loading}
               onChange={load}
-              onStatus={handleStatusChange}
-              onDelete={handleDeleteBooking}
+              onOpenList={(eventId) => navigate(`/list?event=${eventId}`)}
             />
           </TabsContent>
 
@@ -213,7 +195,6 @@ function Dashboard() {
     </div>
   );
 }
-
 function StatCard({
   icon,
   label,
