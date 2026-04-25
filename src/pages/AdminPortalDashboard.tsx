@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
-import { LogOut, Calendar, Users, Euro, Plus, Pencil, Trash2, Tag, Copy, ShieldCheck } from "lucide-react";
+import { LogOut, Calendar, Users, Euro, Plus, Pencil, Trash2, Tag, ShieldCheck, ListChecks } from "lucide-react";
 import StaffManager from "@/components/admin/StaffManager";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,13 +15,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,16 +27,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 type Booking = {
   id: string;
@@ -134,31 +117,6 @@ function Dashboard() {
     })();
   }, [navigate, load]);
 
-  const handleDeleteBooking = async (id: string) => {
-    const { error } = await supabase.from("bookings").delete().eq("id", id);
-    if (error) {
-      toast.error("Delete failed: " + error.message);
-      return;
-    }
-    setBookings((prev) => prev.filter((b) => b.id !== id));
-    toast.success("Booking deleted");
-  };
-
-  const handleStatusChange = async (id: string, status: Booking["payment_status"]) => {
-    const { error } = await supabase
-      .from("bookings")
-      .update({ payment_status: status })
-      .eq("id", id);
-    if (error) {
-      toast.error("Update failed");
-      return;
-    }
-    setBookings((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, payment_status: status } : b))
-    );
-    toast.success("Updated");
-  };
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate("/admin-portal");
@@ -172,10 +130,9 @@ function Dashboard() {
     );
   }
 
-  const totalRevenue = bookings
-    .filter((b) => b.payment_status === "paid")
-    .reduce((sum, b) => sum + Number(b.price_eur), 0);
-  const totalGuests = bookings.reduce((sum, b) => sum + b.number_of_guests, 0);
+  const paidBookings = bookings.filter((b) => b.payment_status === "paid");
+  const totalRevenue = paidBookings.reduce((sum, b) => sum + Number(b.price_eur), 0);
+  const totalGuests = paidBookings.reduce((sum, b) => sum + b.number_of_guests, 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -184,22 +141,31 @@ function Dashboard() {
           <div>
             <h1 className="font-display text-2xl tracking-wide">Admin Dashboard</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            <LogOut className="mr-2 h-4 w-4" /> Sign out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => navigate("/list")}
+            >
+              <ListChecks className="mr-2 h-4 w-4" /> Guest List
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" /> Sign out
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6 grid gap-4 md:grid-cols-3">
-          <StatCard icon={<Calendar />} label="Total bookings" value={bookings.length.toString()} />
-          <StatCard icon={<Users />} label="Total guests" value={totalGuests.toString()} />
+          <StatCard icon={<Calendar />} label="Paid bookings" value={paidBookings.length.toString()} />
+          <StatCard icon={<Users />} label="Confirmed guests" value={totalGuests.toString()} />
           <StatCard icon={<Euro />} label="Paid revenue" value={`€${totalRevenue.toFixed(2)}`} />
         </div>
 
         <Tabs defaultValue="events" className="w-full">
           <TabsList>
-            <TabsTrigger value="events">Events & Guests</TabsTrigger>
+            <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="prcodes">PR Codes</TabsTrigger>
             <TabsTrigger value="staff">
               <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
@@ -210,11 +176,10 @@ function Dashboard() {
           <TabsContent value="events" className="mt-4">
             <EventsManager
               events={events}
-              bookings={bookings}
+              bookings={paidBookings}
               loading={loading}
               onChange={load}
-              onStatus={handleStatusChange}
-              onDelete={handleDeleteBooking}
+              onOpenList={(eventId) => navigate(`/list?event=${eventId}`)}
             />
           </TabsContent>
 
@@ -230,7 +195,6 @@ function Dashboard() {
     </div>
   );
 }
-
 function StatCard({
   icon,
   label,
@@ -252,125 +216,6 @@ function StatCard({
         </div>
       </div>
     </div>
-  );
-}
-
-function BookingRows({
-  list,
-  onStatus,
-  onDelete,
-}: {
-  list: Booking[];
-  onStatus: (id: string, status: Booking["payment_status"]) => void;
-  onDelete: (b: Booking) => void;
-}) {
-  if (list.length === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
-        No bookings in this category yet.
-      </div>
-    );
-  }
-  return (
-    <div className="overflow-x-auto rounded-xl border border-border glass">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Tier</TableHead>
-            <TableHead>Guests</TableHead>
-            <TableHead>Price</TableHead>
-            <TableHead>Ticket ID</TableHead>
-            <TableHead>PR Code</TableHead>
-            <TableHead>Booked</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {list.map((b) => (
-            <TableRow key={b.id}>
-              <TableCell className="font-medium">{b.full_name}</TableCell>
-              <TableCell className="text-sm">
-                <div>{b.email}</div>
-                <div className="text-muted-foreground">{b.phone}</div>
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary" className="capitalize">
-                  {b.tier}
-                </Badge>
-              </TableCell>
-              <TableCell>{b.tier === "entrance" ? "—" : b.number_of_guests}</TableCell>
-              <TableCell>€{Number(b.price_eur).toFixed(2)}</TableCell>
-              <TableCell className="font-mono text-xs">
-                {b.ticket_code ?? <span className="text-muted-foreground">—</span>}
-              </TableCell>
-              <TableCell className="text-sm">
-                {b.pr_code ? <Badge variant="outline">{b.pr_code}</Badge> : "—"}
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {format(new Date(b.created_at), "PP")}
-              </TableCell>
-              <TableCell>
-                <Select
-                  value={b.payment_status}
-                  onValueChange={(v) => onStatus(b.id, v as Booking["payment_status"])}
-                >
-                  <SelectTrigger className="h-8 w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell>
-                <Button size="sm" variant="outline" onClick={() => onDelete(b)}>
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function copyAttendeeList(list: Booking[]) {
-  const header = [
-    "Name",
-    "Email",
-    "Phone",
-    "Tier",
-    "Guests",
-    "Price (EUR)",
-    "Ticket ID",
-    "PR Code",
-    "Status",
-    "Booked",
-  ].join("\t");
-  const rows = list.map((b) =>
-    [
-      b.full_name,
-      b.email,
-      b.phone,
-      b.tier,
-      b.tier === "entrance" ? 1 : b.number_of_guests,
-      Number(b.price_eur).toFixed(2),
-      b.ticket_code ?? "",
-      b.pr_code ?? "",
-      b.payment_status,
-      format(new Date(b.created_at), "yyyy-MM-dd"),
-    ].join("\t")
-  );
-  const text = [header, ...rows].join("\n");
-  navigator.clipboard.writeText(text).then(
-    () => toast.success("Attendee list copied to clipboard"),
-    () => toast.error("Could not copy to clipboard")
   );
 }
 
@@ -399,23 +244,19 @@ function EventsManager({
   bookings,
   loading,
   onChange,
-  onStatus,
-  onDelete,
+  onOpenList,
 }: {
   events: Event[];
   bookings: Booking[];
   loading: boolean;
   onChange: () => void;
-  onStatus: (id: string, status: Booking["payment_status"]) => void;
-  onDelete: (id: string) => void;
+  onOpenList: (eventId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Event | null>(null);
   const [form, setForm] = useState({ ...emptyEventForm });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [viewingEventId, setViewingEventId] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<Booking | null>(null);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
 
   // Resolve signed URLs for any event posters (storage paths) we don't have a URL for yet.
@@ -444,12 +285,6 @@ function EventsManager({
     return previewUrls[val] ?? "";
   };
 
-  const viewingEvent = events.find((e) => e.id === viewingEventId) ?? null;
-  const eventBookings = viewingEventId
-    ? bookings.filter((b) => b.event_id === viewingEventId)
-    : [];
-  const reservations = eventBookings.filter((b) => b.tier === "standard" || b.tier === "vip");
-  const entrance = eventBookings.filter((b) => b.tier === "entrance");
 
   const startCreate = () => {
     setEditing(null);
@@ -566,112 +401,6 @@ function EventsManager({
     onChange();
   };
 
-  if (viewingEvent) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <Button variant="outline" size="sm" onClick={() => setViewingEventId(null)}>
-            ← Back to events
-          </Button>
-          <h2 className="font-display text-2xl tracking-wide">{viewingEvent.title}</h2>
-          <Button size="sm" variant="outline" onClick={() => startEdit(viewingEvent)}>
-            <Pencil className="mr-1 h-3 w-3" /> Edit event
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3 text-center text-sm">
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="text-xs uppercase text-muted-foreground">Total guests</div>
-            <div className="text-xl font-bold">{eventBookings.length}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="text-xs uppercase text-muted-foreground">Reservations</div>
-            <div className="text-xl font-bold">{reservations.length}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-3">
-            <div className="text-xs uppercase text-muted-foreground">Entrance</div>
-            <div className="text-xl font-bold">{entrance.length}</div>
-          </div>
-        </div>
-
-        <Tabs defaultValue="reservations">
-          <TabsList>
-            <TabsTrigger value="reservations">
-              Reservations ({reservations.length})
-            </TabsTrigger>
-            <TabsTrigger value="entrance">Entrance Tickets ({entrance.length})</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="reservations" className="mt-3 space-y-2">
-            <div className="flex justify-end">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={reservations.length === 0}
-                onClick={() => copyAttendeeList(reservations)}
-              >
-                <Copy className="mr-1 h-3 w-3" /> Copy List
-              </Button>
-            </div>
-            <BookingRows list={reservations} onStatus={onStatus} onDelete={setConfirmDelete} />
-          </TabsContent>
-
-          <TabsContent value="entrance" className="mt-3 space-y-2">
-            <div className="flex justify-end">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={entrance.length === 0}
-                onClick={() => copyAttendeeList(entrance)}
-              >
-                <Copy className="mr-1 h-3 w-3" /> Copy List
-              </Button>
-            </div>
-            <BookingRows list={entrance} onStatus={onStatus} onDelete={setConfirmDelete} />
-          </TabsContent>
-        </Tabs>
-
-        <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete this booking?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {confirmDelete &&
-                  `This will permanently delete the booking for ${confirmDelete.full_name} (${confirmDelete.email}).`}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  if (confirmDelete) onDelete(confirmDelete.id);
-                  setConfirmDelete(null);
-                }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Edit dialog reused */}
-        <EventFormDialog
-          open={open}
-          setOpen={setOpen}
-          editing={editing}
-          form={form}
-          setForm={setForm}
-          saving={saving}
-          uploading={uploading}
-          onUpload={handleUpload}
-          onSave={handleSave}
-          posterPreviewUrl={posterSrc(form.poster_url)}
-        />
-      </div>
-    );
-  }
-
   return (
     <div>
       <div className="mb-4 flex justify-end">
@@ -740,7 +469,7 @@ function EventsManager({
                     {count} guest{count !== 1 ? "s" : ""} booked
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => setViewingEventId(e.id)}>
+                    <Button size="sm" onClick={() => onOpenList(e.id)}>
                       <Users className="mr-1 h-3 w-3" /> View Guests
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => startEdit(e)}>

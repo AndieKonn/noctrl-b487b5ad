@@ -206,6 +206,11 @@ export default function Index() {
     return isEntrance ? event.tickets_remaining <= 0 : event.reservations_remaining <= 0;
   }, [event, isEntrance]);
 
+  const remainingForTier = useMemo(() => {
+    if (!event) return 0;
+    return isEntrance ? event.tickets_remaining : event.reservations_remaining;
+  }, [event, isEntrance]);
+
   const validate = () => {
     const next: typeof errors = {};
     if (!EMAIL_REGEX.test(email.trim())) {
@@ -226,6 +231,15 @@ export default function Index() {
     if (!event || !selected) return;
     if (soldOut) {
       toast.error("Sorry, this option is sold out.");
+      return;
+    }
+    const requested = Math.max(1, parseInt(guests, 10) || 1);
+    if (requested > remainingForTier) {
+      toast.error(
+        isEntrance
+          ? `Only ${remainingForTier} entrance ticket${remainingForTier === 1 ? "" : "s"} left for this event.`
+          : `Only ${remainingForTier} reservation spot${remainingForTier === 1 ? "" : "s"} left. Please lower the party size.`,
+      );
       return;
     }
     if (!validate()) return;
@@ -323,14 +337,24 @@ export default function Index() {
 
     if (error) {
       setSubmitting(false);
-      toast.error("Could not save your booking. Please try again.");
+      const msg = (error.message || "").toLowerCase();
+      if (msg.includes("sold out") || msg.includes("insufficient capacity")) {
+        toast.error(
+          isEntrance
+            ? "Not enough entrance tickets left for that quantity."
+            : "Not enough reservation spots left for your party size.",
+        );
+      } else {
+        toast.error("Could not save your booking. Please try again.");
+      }
       return;
     }
 
+    // Capacity is decremented automatically by the enforce_booking_capacity trigger.
+    // Reflect that locally so the UI updates without a round-trip.
     const update = isEntrance
       ? { tickets_remaining: Math.max(0, event.tickets_remaining - quantity) }
       : { reservations_remaining: Math.max(0, event.reservations_remaining - quantity) };
-    await supabase.from("events").update(update).eq("id", event.id);
     setEvents((prev) =>
       prev.map((ev) => (ev.id === event.id ? ({ ...ev, ...update } as ActiveEvent) : ev))
     );
@@ -634,15 +658,19 @@ export default function Index() {
                   id="guests"
                   type="number"
                   min={1}
-                  max={50}
+                  max={Math.max(1, remainingForTier || 50)}
                   required
                   value={guests}
                   onChange={(e) => setGuests(e.target.value)}
                   className="mt-1.5"
                 />
-                {isEntrance && (
+                {isEntrance ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    You'll receive one QR code per ticket.
+                    You'll receive one QR code per ticket. {remainingForTier} left.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {remainingForTier} reservation spot{remainingForTier === 1 ? "" : "s"} left.
                   </p>
                 )}
               </div>
