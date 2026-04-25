@@ -244,23 +244,19 @@ function EventsManager({
   bookings,
   loading,
   onChange,
-  onStatus,
-  onDelete,
+  onOpenList,
 }: {
   events: Event[];
   bookings: Booking[];
   loading: boolean;
   onChange: () => void;
-  onStatus: (id: string, status: Booking["payment_status"]) => void;
-  onDelete: (id: string) => void;
+  onOpenList: (eventId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Event | null>(null);
   const [form, setForm] = useState({ ...emptyEventForm });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [viewingEventId, setViewingEventId] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<Booking | null>(null);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
 
   // Resolve signed URLs for any event posters (storage paths) we don't have a URL for yet.
