@@ -206,6 +206,11 @@ export default function Index() {
     return isEntrance ? event.tickets_remaining <= 0 : event.reservations_remaining <= 0;
   }, [event, isEntrance]);
 
+  const remainingForTier = useMemo(() => {
+    if (!event) return 0;
+    return isEntrance ? event.tickets_remaining : event.reservations_remaining;
+  }, [event, isEntrance]);
+
   const validate = () => {
     const next: typeof errors = {};
     if (!EMAIL_REGEX.test(email.trim())) {
