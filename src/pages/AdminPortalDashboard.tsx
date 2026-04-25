@@ -285,12 +285,6 @@ function EventsManager({
     return previewUrls[val] ?? "";
   };
 
-  const viewingEvent = events.find((e) => e.id === viewingEventId) ?? null;
-  const eventBookings = viewingEventId
-    ? bookings.filter((b) => b.event_id === viewingEventId)
-    : [];
-  const reservations = eventBookings.filter((b) => b.tier === "standard" || b.tier === "vip");
-  const entrance = eventBookings.filter((b) => b.tier === "entrance");
 
   const startCreate = () => {
     setEditing(null);
