@@ -233,6 +233,15 @@ export default function Index() {
       toast.error("Sorry, this option is sold out.");
       return;
     }
+    const requested = Math.max(1, parseInt(guests, 10) || 1);
+    if (requested > remainingForTier) {
+      toast.error(
+        isEntrance
+          ? `Only ${remainingForTier} entrance ticket${remainingForTier === 1 ? "" : "s"} left for this event.`
+          : `Only ${remainingForTier} reservation spot${remainingForTier === 1 ? "" : "s"} left. Please lower the party size.`,
+      );
+      return;
+    }
     if (!validate()) return;
 
     // If the email isn't verified yet, kick off verification first.
