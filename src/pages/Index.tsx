@@ -335,20 +335,6 @@ export default function Index() {
       payment_status: "pending",
     });
 
-    const { error } = await supabase.from("bookings").insert({
-      full_name: fullName,
-      phone,
-      email,
-      number_of_guests: quantity,
-      event_date: event.event_date ?? new Date().toISOString().slice(0, 10),
-      event_id: event.id,
-      tier,
-      price_eur: selected.price * (isEntrance ? quantity : 1),
-      pr_code: validatedCode,
-      ticket_code: ticketCode,
-      payment_status: "pending",
-    });
-
     if (error) {
       setSubmitting(false);
       const msg = (error.message || "").toLowerCase();
@@ -364,10 +350,11 @@ export default function Index() {
       return;
     }
 
+    // Capacity is decremented automatically by the enforce_booking_capacity trigger.
+    // Reflect that locally so the UI updates without a round-trip.
     const update = isEntrance
       ? { tickets_remaining: Math.max(0, event.tickets_remaining - quantity) }
       : { reservations_remaining: Math.max(0, event.reservations_remaining - quantity) };
-    await supabase.from("events").update(update).eq("id", event.id);
     setEvents((prev) =>
       prev.map((ev) => (ev.id === event.id ? ({ ...ev, ...update } as ActiveEvent) : ev))
     );
