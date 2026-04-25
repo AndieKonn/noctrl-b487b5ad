@@ -335,9 +335,32 @@ export default function Index() {
       payment_status: "pending",
     });
 
+    const { error } = await supabase.from("bookings").insert({
+      full_name: fullName,
+      phone,
+      email,
+      number_of_guests: quantity,
+      event_date: event.event_date ?? new Date().toISOString().slice(0, 10),
+      event_id: event.id,
+      tier,
+      price_eur: selected.price * (isEntrance ? quantity : 1),
+      pr_code: validatedCode,
+      ticket_code: ticketCode,
+      payment_status: "pending",
+    });
+
     if (error) {
       setSubmitting(false);
-      toast.error("Could not save your booking. Please try again.");
+      const msg = (error.message || "").toLowerCase();
+      if (msg.includes("sold out") || msg.includes("insufficient capacity")) {
+        toast.error(
+          isEntrance
+            ? "Not enough entrance tickets left for that quantity."
+            : "Not enough reservation spots left for your party size.",
+        );
+      } else {
+        toast.error("Could not save your booking. Please try again.");
+      }
       return;
     }
 
