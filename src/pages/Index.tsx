@@ -658,15 +658,19 @@ export default function Index() {
                   id="guests"
                   type="number"
                   min={1}
-                  max={50}
+                  max={Math.max(1, remainingForTier || 50)}
                   required
                   value={guests}
                   onChange={(e) => setGuests(e.target.value)}
                   className="mt-1.5"
                 />
-                {isEntrance && (
+                {isEntrance ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    You'll receive one QR code per ticket.
+                    You'll receive one QR code per ticket. {remainingForTier} left.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {remainingForTier} reservation spot{remainingForTier === 1 ? "" : "s"} left.
                   </p>
                 )}
               </div>
