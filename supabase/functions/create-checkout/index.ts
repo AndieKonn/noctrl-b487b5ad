@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .select(
-        "id, ticket_code, email, price_eur, number_of_guests, tier, payment_status, event_id",
+        "id, ticket_code, email, price_eur, number_of_guests, tier, tier_id, payment_status, event_id",
       )
       .eq("ticket_code", ticketCode)
       .maybeSingle();
@@ -69,21 +69,50 @@ Deno.serve(async (req) => {
     }
 
     let eventTitle = "NoCTRL Event";
-    let perTicketPrice = Number(booking.price_eur);
     if (booking.event_id) {
       const { data: ev } = await supabase
         .from("events")
-        .select("title, price_entrance, price_standard, price_vip")
+        .select("title")
+        .eq("id", booking.event_id)
+        .maybeSingle();
+      if (ev?.title) eventTitle = ev.title;
+    }
+
+    // Resolve per-ticket price + tier name from event_tiers (preferred) or legacy fields
+    let perTicketPrice = Number(booking.price_eur);
+    let tierName = "Reservation";
+    let tierCategory: "entrance" | "reservation" = "reservation";
+
+    if (booking.tier_id) {
+      const { data: t } = await supabase
+        .from("event_tiers")
+        .select("name, price_eur, category")
+        .eq("id", booking.tier_id)
+        .maybeSingle();
+      if (t) {
+        tierName = t.name;
+        tierCategory = t.category as "entrance" | "reservation";
+        perTicketPrice = Number(t.price_eur);
+      }
+    } else if (booking.event_id) {
+      const { data: ev } = await supabase
+        .from("events")
+        .select("price_entrance, price_standard, price_vip")
         .eq("id", booking.event_id)
         .maybeSingle();
       if (ev) {
-        eventTitle = ev.title;
         perTicketPrice = booking.tier === "entrance"
           ? Number(ev.price_entrance)
           : booking.tier === "vip"
           ? Number(ev.price_vip)
           : Number(ev.price_standard);
       }
+      tierCategory = booking.tier === "entrance" ? "entrance" : "reservation";
+      tierName = booking.tier === "entrance"
+        ? "Entrance Ticket"
+        : booking.tier === "vip"
+        ? "VIP Reservation"
+        : "Standard Reservation";
     }
 
     if (!Number.isFinite(perTicketPrice) || perTicketPrice <= 0) {
@@ -93,19 +122,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Reservations: 1 line item for the whole party (price already covers party).
-    // Entrance: charge per individual ticket — quantity = number_of_guests.
-    const isEntrance = booking.tier === "entrance";
+    const isEntrance = tierCategory === "entrance";
     const quantity = isEntrance ? Math.max(1, booking.number_of_guests) : 1;
 
-    const tierName = isEntrance
-      ? "Entrance Ticket"
-      : booking.tier === "vip"
-      ? "VIP Reservation"
-      : "Standard Reservation";
-
     const productName = isEntrance
-      ? `${eventTitle} — Entrance Ticket`
+      ? `${eventTitle} — ${tierName}`
       : `${eventTitle} — ${tierName} (${booking.number_of_guests} guests)`;
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2024-11-20.acacia" });

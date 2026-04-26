@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { Check, Sparkles, AlertTriangle, Ticket, Instagram, Mail } from "lucide-react";
+import { Check, Sparkles, AlertTriangle, Instagram, Mail, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,24 +29,26 @@ import {
 import { cn } from "@/lib/utils";
 import logo from "@/assets/noctrl-logo.png";
 
-type TierId = "entrance" | "standard" | "vip";
-
 type ActiveEvent = {
   id: string;
   title: string;
   description: string;
   poster_url: string | null;
   event_date: string | null;
-  price_entrance: number;
-  price_standard: number;
-  price_vip: number;
-  perks_entrance: string;
-  perks_standard: string;
-  perks_vip: string;
-  ticket_limit: number;
-  reservation_limit: number;
-  tickets_remaining: number;
-  reservations_remaining: number;
+};
+
+type EventTier = {
+  id: string;
+  event_id: string;
+  category: "entrance" | "reservation";
+  name: string;
+  description: string;
+  price_eur: number;
+  perks: string;
+  capacity: number;
+  remaining: number;
+  sort_order: number;
+  is_active: boolean;
 };
 
 const LOW_STOCK_PCT = 0.1;
@@ -59,17 +62,15 @@ const generateTicketCode = () => {
 };
 
 const splitPerks = (s: string) =>
-  s
-    .split(/\r?\n|,/)
-    .map((x) => x.trim())
-    .filter(Boolean);
+  s.split(/\r?\n|,/).map((x) => x.trim()).filter(Boolean);
 
 export default function Index() {
   const [events, setEvents] = useState<ActiveEvent[]>([]);
+  const [tiers, setTiers] = useState<EventTier[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [posterUrls, setPosterUrls] = useState<Record<string, string>>({});
-  const [tier, setTier] = useState<TierId>("standard");
+  const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -79,16 +80,8 @@ export default function Index() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; phone?: string; age?: string }>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [issuedTicket, setIssuedTicket] = useState<{
-    code: string;
-    eventTitle: string;
-    tierName: string;
-    fullName: string;
-  } | null>(null);
   const [paymentSuccessOpen, setPaymentSuccessOpen] = useState(false);
-  const [successTicketCode, setSuccessTicketCode] = useState<string | null>(null);
 
-  // Email verification
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [verifyCode, setVerifyCode] = useState("");
   const [verifySending, setVerifySending] = useState(false);
@@ -99,10 +92,8 @@ export default function Index() {
     const params = new URLSearchParams(window.location.search);
     const payment = params.get("payment");
     if (payment === "success") {
-      setSuccessTicketCode(params.get("ticket"));
       setPaymentSuccessOpen(true);
       toast.success("Payment successful! Your booking is confirmed.");
-      // Clean the URL so refreshing doesn't re-trigger the popup
       const url = new URL(window.location.href);
       url.searchParams.delete("payment");
       url.searchParams.delete("ticket");
@@ -117,17 +108,27 @@ export default function Index() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const { data: evData } = await supabase
         .from("events")
-        .select("*")
+        .select("id, title, description, poster_url, event_date")
         .eq("is_active", true)
         .order("event_date", { ascending: true, nullsFirst: false });
-      const list = (data ?? []) as ActiveEvent[];
+      const list = (evData ?? []) as ActiveEvent[];
       setEvents(list);
       if (list.length > 0) setSelectedEventId(list[0].id);
+
+      if (list.length > 0) {
+        const { data: tierData } = await supabase
+          .from("event_tiers")
+          .select("*")
+          .in("event_id", list.map((e) => e.id))
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true });
+        setTiers((tierData ?? []) as EventTier[]);
+      }
+
       setLoading(false);
 
-      // Resolve signed URLs for any poster paths (private bucket).
       const paths = list
         .map((e) => e.poster_url)
         .filter((p): p is string => !!p && !p.startsWith("http"));
@@ -157,71 +158,44 @@ export default function Index() {
     [events, selectedEventId]
   );
 
-  const tiers = useMemo(() => {
-    if (!event) return [];
-    return [
-      {
-        id: "entrance" as const,
-        name: "Entrance Ticket",
-        price: Number(event.price_entrance),
-        description: "Get in the door and enjoy the night.",
-        perks: splitPerks(event.perks_entrance) ?? [],
-      },
-      {
-        id: "standard" as const,
-        name: "Standard Reservation",
-        price: Number(event.price_standard),
-        description: "Reserved table for the full experience.",
-        perks: splitPerks(event.perks_standard) ?? [],
-      },
-      {
-        id: "vip" as const,
-        name: "VIP Reservation",
-        price: Number(event.price_vip),
-        description: "The full VIP treatment for you and your guests.",
-        perks: splitPerks(event.perks_vip) ?? [],
-      },
-    ];
-  }, [event]);
+  const eventTiers = useMemo(
+    () => tiers.filter((t) => t.event_id === selectedEventId),
+    [tiers, selectedEventId]
+  );
 
-  const selected = tiers.find((t) => t.id === tier);
-
-  const isEntrance = tier === "entrance";
-  const lowStock = useMemo(() => {
-    if (!event) return false;
-    if (isEntrance) {
-      return (
-        event.ticket_limit > 0 &&
-        event.tickets_remaining / event.ticket_limit <= LOW_STOCK_PCT
-      );
+  // Auto-select first available tier when event changes
+  useEffect(() => {
+    if (!eventTiers.length) {
+      setSelectedTierId(null);
+      return;
     }
-    return (
-      event.reservation_limit > 0 &&
-      event.reservations_remaining / event.reservation_limit <= LOW_STOCK_PCT
-    );
-  }, [event, isEntrance]);
+    const stillValid = eventTiers.find((t) => t.id === selectedTierId);
+    if (!stillValid) {
+      const firstAvailable = eventTiers.find((t) => t.remaining > 0) ?? eventTiers[0];
+      setSelectedTierId(firstAvailable.id);
+    }
+  }, [eventTiers, selectedTierId]);
 
-  const soldOut = useMemo(() => {
-    if (!event) return false;
-    return isEntrance ? event.tickets_remaining <= 0 : event.reservations_remaining <= 0;
-  }, [event, isEntrance]);
+  const selected = eventTiers.find((t) => t.id === selectedTierId) ?? null;
+  const isEntrance = selected?.category === "entrance";
+  const remainingForTier = selected?.remaining ?? 0;
 
-  const remainingForTier = useMemo(() => {
-    if (!event) return 0;
-    return isEntrance ? event.tickets_remaining : event.reservations_remaining;
-  }, [event, isEntrance]);
+  // Fully sold out across the entire event (every tier exhausted)
+  const eventSoldOut = useMemo(() => {
+    if (!eventTiers.length) return false;
+    return eventTiers.every((t) => t.remaining <= 0);
+  }, [eventTiers]);
+
+  const tierSoldOut = !!selected && selected.remaining <= 0;
+  const lowStock = !!selected && selected.capacity > 0 &&
+    selected.remaining / selected.capacity <= LOW_STOCK_PCT &&
+    selected.remaining > 0;
 
   const validate = () => {
     const next: typeof errors = {};
-    if (!EMAIL_REGEX.test(email.trim())) {
-      next.email = "Please enter a valid email address.";
-    }
-    if (!PHONE_REGEX.test(phone.trim())) {
-      next.phone = "Please enter a valid phone number (digits only, optional + prefix).";
-    }
-    if (!ageConfirmed) {
-      next.age = "You must confirm you are 17 or older.";
-    }
+    if (!EMAIL_REGEX.test(email.trim())) next.email = "Please enter a valid email address.";
+    if (!PHONE_REGEX.test(phone.trim())) next.phone = "Please enter a valid phone number (digits only, optional + prefix).";
+    if (!ageConfirmed) next.age = "You must confirm you are 17 or older.";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -229,29 +203,25 @@ export default function Index() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!event || !selected) return;
-    if (soldOut) {
+    if (tierSoldOut) {
       toast.error("Sorry, this option is sold out.");
       return;
     }
-    const requested = Math.max(1, parseInt(guests, 10) || 1);
-    if (requested > remainingForTier) {
-      toast.error(
-        isEntrance
-          ? `Only ${remainingForTier} entrance ticket${remainingForTier === 1 ? "" : "s"} left for this event.`
-          : `Only ${remainingForTier} reservation spot${remainingForTier === 1 ? "" : "s"} left. Please lower the party size.`,
-      );
-      return;
+    if (isEntrance) {
+      const requested = Math.max(1, parseInt(guests, 10) || 1);
+      if (requested > remainingForTier) {
+        toast.error(`Only ${remainingForTier} ticket${remainingForTier === 1 ? "" : "s"} left.`);
+        return;
+      }
     }
     if (!validate()) return;
 
-    // If the email isn't verified yet, kick off verification first.
     const cleanEmail = email.trim().toLowerCase();
     if (verifiedEmail !== cleanEmail) {
       setVerifySending(true);
-      const { error: sendErr } = await supabase.functions.invoke(
-        "send-email-verification",
-        { body: { email: cleanEmail } },
-      );
+      const { error: sendErr } = await supabase.functions.invoke("send-email-verification", {
+        body: { email: cleanEmail },
+      });
       setVerifySending(false);
       if (sendErr) {
         toast.error("Couldn't send verification email. Please try again.");
@@ -277,7 +247,6 @@ export default function Index() {
       body: { email: cleanEmail, code: verifyCode.trim() },
     });
     setVerifying(false);
-
     const errMsg = (data as { error?: string })?.error;
     if (error || errMsg) {
       toast.error(errMsg ?? error?.message ?? "Verification failed");
@@ -292,10 +261,9 @@ export default function Index() {
   const handleResendCode = async () => {
     const cleanEmail = email.trim().toLowerCase();
     setVerifySending(true);
-    const { error: sendErr } = await supabase.functions.invoke(
-      "send-email-verification",
-      { body: { email: cleanEmail } },
-    );
+    const { error: sendErr } = await supabase.functions.invoke("send-email-verification", {
+      body: { email: cleanEmail },
+    });
     setVerifySending(false);
     if (sendErr) toast.error("Couldn't resend code.");
     else toast.success("New code sent.");
@@ -321,6 +289,10 @@ export default function Index() {
     const ticketCode = generateTicketCode();
     const quantity = isEntrance ? Math.max(1, parseInt(guests, 10)) : parseInt(guests, 10);
 
+    // Map dynamic category back to legacy enum (db trigger requires NOT NULL).
+    const legacyTier: "entrance" | "standard" | "vip" =
+      selected.category === "entrance" ? "entrance" : "standard";
+
     const { error } = await supabase.from("bookings").insert({
       full_name: fullName,
       phone,
@@ -328,8 +300,9 @@ export default function Index() {
       number_of_guests: quantity,
       event_date: event.event_date ?? new Date().toISOString().slice(0, 10),
       event_id: event.id,
-      tier,
-      price_eur: selected.price * (isEntrance ? quantity : 1),
+      tier: legacyTier,
+      tier_id: selected.id,
+      price_eur: selected.price_eur * (isEntrance ? quantity : 1),
       pr_code: validatedCode,
       ticket_code: ticketCode,
       payment_status: "pending",
@@ -341,8 +314,8 @@ export default function Index() {
       if (msg.includes("sold out") || msg.includes("insufficient capacity")) {
         toast.error(
           isEntrance
-            ? "Not enough entrance tickets left for that quantity."
-            : "Not enough reservation spots left for your party size.",
+            ? "Not enough tickets left for that quantity."
+            : "Not enough reservation spots left.",
         );
       } else {
         toast.error("Could not save your booking. Please try again.");
@@ -350,27 +323,20 @@ export default function Index() {
       return;
     }
 
-    // Capacity is decremented automatically by the enforce_booking_capacity trigger.
-    // Reflect that locally so the UI updates without a round-trip.
-    const update = isEntrance
-      ? { tickets_remaining: Math.max(0, event.tickets_remaining - quantity) }
-      : { reservations_remaining: Math.max(0, event.reservations_remaining - quantity) };
-    setEvents((prev) =>
-      prev.map((ev) => (ev.id === event.id ? ({ ...ev, ...update } as ActiveEvent) : ev))
+    // Reflect remaining decrement locally (entrance: -quantity, reservation: -1)
+    const dec = isEntrance ? quantity : 1;
+    setTiers((prev) =>
+      prev.map((t) => (t.id === selected.id ? { ...t, remaining: Math.max(0, t.remaining - dec) } : t))
     );
 
     const origin = window.location.origin;
-
-    const { data: checkout, error: fnError } = await supabase.functions.invoke(
-      "create-checkout",
-      {
-        body: {
-          ticketCode,
-          successUrl: `${origin}/?payment=success&ticket=${ticketCode}`,
-          cancelUrl: `${origin}/?payment=cancelled`,
-        },
-      }
-    );
+    const { data: checkout, error: fnError } = await supabase.functions.invoke("create-checkout", {
+      body: {
+        ticketCode,
+        successUrl: `${origin}/?payment=success&ticket=${ticketCode}`,
+        cancelUrl: `${origin}/?payment=cancelled`,
+      },
+    });
 
     if (fnError || !checkout?.url) {
       setSubmitting(false);
@@ -390,14 +356,19 @@ export default function Index() {
       >
         <nav className="relative z-10 flex items-center justify-between gap-3 px-4 py-5 md:px-10">
           <div className="flex items-center gap-2">
-            <img
-              src={logo}
-              alt="NoCTRL logo"
-              className="h-8 w-8 object-contain md:h-10 md:w-10"
-            />
+            <img src={logo} alt="NoCTRL logo" className="h-8 w-8 object-contain md:h-10 md:w-10" />
             <span className="font-display text-2xl tracking-widest md:text-3xl">NOCTRL</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
+            <Link
+              to="/gallery"
+              aria-label="Gallery"
+              title="Event Gallery"
+              className="group inline-flex items-center gap-1.5 rounded-xl px-2 py-1 text-primary transition-all duration-300 hover:scale-105 hover:text-accent hover:shadow-[var(--shadow-glow)]"
+            >
+              <ImageIcon className="h-7 w-7 md:h-9 md:w-9" strokeWidth={2.25} />
+              <span className="hidden sm:inline font-display text-sm tracking-[0.2em] uppercase">Gallery</span>
+            </Link>
             <a
               href="mailto:noctrlcy@gmail.com"
               aria-label="Email NoCTRL"
@@ -413,35 +384,7 @@ export default function Index() {
               aria-label="NoCTRL on Instagram"
               className="group inline-flex items-center justify-center rounded-xl p-1 transition-all duration-300 hover:scale-110 hover:shadow-[var(--shadow-glow)]"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 32 32"
-                className="h-8 w-8 md:h-10 md:w-10"
-                aria-hidden="true"
-              >
-                <defs>
-                  <radialGradient id="ig-grad" cx="30%" cy="107%" r="150%">
-                    <stop offset="0%" stopColor="#fdf497" />
-                    <stop offset="5%" stopColor="#fdf497" />
-                    <stop offset="45%" stopColor="#fd5949" />
-                    <stop offset="60%" stopColor="#d6249f" />
-                    <stop offset="90%" stopColor="#285AEB" />
-                  </radialGradient>
-                </defs>
-                <rect x="2" y="2" width="28" height="28" rx="7" fill="url(#ig-grad)" />
-                <rect
-                  x="6.5"
-                  y="6.5"
-                  width="19"
-                  height="19"
-                  rx="5.5"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2"
-                />
-                <circle cx="16" cy="16" r="4.5" fill="none" stroke="#fff" strokeWidth="2" />
-                <circle cx="22.5" cy="9.5" r="1.4" fill="#fff" />
-              </svg>
+              <Instagram className="h-8 w-8 md:h-10 md:w-10 text-primary" strokeWidth={2.25} />
             </a>
           </div>
         </nav>
@@ -486,9 +429,7 @@ export default function Index() {
                   onClick={() => setSelectedEventId(ev.id)}
                   className={cn(
                     "glass rounded-xl p-4 text-left transition-all",
-                    active
-                      ? "border-primary shadow-[var(--shadow-glow)]"
-                      : "hover:border-primary/50"
+                    active ? "border-primary shadow-[var(--shadow-glow)]" : "hover:border-primary/50"
                   )}
                 >
                   <div className="font-display text-lg tracking-wide">{ev.title}</div>
@@ -527,7 +468,7 @@ export default function Index() {
         </section>
       )}
 
-      {event && (
+      {event && eventTiers.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 py-16 md:py-24" id="book">
           <div className="mb-10 text-center">
             <h2 className="font-display text-4xl tracking-wide md:text-5xl">Choose your tier</h2>
@@ -536,213 +477,226 @@ export default function Index() {
             </p>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-3">
-            {tiers.map((t) => {
-              const active = tier === t.id;
-              return (
-                <button
-                  type="button"
-                  key={t.id}
-                  onClick={() => setTier(t.id)}
-                  className={cn(
-                    "group relative rounded-2xl glass p-6 text-left transition-all",
-                    active
-                      ? "border-primary shadow-[var(--shadow-glow)]"
-                      : "hover:border-primary/50"
-                  )}
-                >
-                  {active && (
-                    <span className="absolute right-4 top-4 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Check className="h-4 w-4" />
-                    </span>
-                  )}
-                  <h3 className="font-display text-2xl tracking-wide">{t.name}</h3>
-                  <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold">€{t.price}</span>
-                  </div>
-                  <p className="mt-3 text-sm text-muted-foreground">{t.description}</p>
-                  {t.perks.length > 0 && (
-                    <ul className="mt-5 space-y-2 text-sm">
-                      {t.perks.map((p) => (
-                        <li key={p} className="flex items-start gap-2">
-                          <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                          <span>{p}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <form
-            onSubmit={handleFormSubmit}
-            className="mx-auto mt-12 max-w-2xl rounded-2xl glass-strong p-6 md:p-10"
-          >
-            <h3 className="font-display text-3xl tracking-wide">Your details</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              You selected <span className="text-foreground">{selected?.name}</span> — €
-              {selected ? (isEntrance ? selected.price * Math.max(1, parseInt(guests, 10) || 1) : selected.price) : 0}
-              {isEntrance && parseInt(guests, 10) > 1 && (
-                <span className="text-xs"> ({guests} × €{selected?.price})</span>
-              )}
-            </p>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <Label htmlFor="fullName">
-                  Full name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="fullName"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Jane Doe"
-                  className="mt-1.5"
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">
-                  Phone number <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    if (errors.phone) setErrors({ ...errors, phone: undefined });
-                  }}
-                  placeholder="+357 99 123 456"
-                  className="mt-1.5"
-                  aria-invalid={!!errors.phone}
-                />
-                {errors.phone && (
-                  <p className="mt-1 text-xs text-destructive">{errors.phone}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="email">
-                  Email <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    // Changing email invalidates a previous verification
-                    if (verifiedEmail && e.target.value.trim().toLowerCase() !== verifiedEmail) {
-                      setVerifiedEmail(null);
-                    }
-                    if (errors.email) setErrors({ ...errors, email: undefined });
-                  }}
-                  placeholder="you@example.com"
-                  className="mt-1.5"
-                  aria-invalid={!!errors.email}
-                />
-                {errors.email && (
-                  <p className="mt-1 text-xs text-destructive">{errors.email}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="guests">
-                  {isEntrance ? "Number of tickets" : "Number of people"}{" "}
-                  <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="guests"
-                  type="number"
-                  min={1}
-                  max={Math.max(1, remainingForTier || 50)}
-                  required
-                  value={guests}
-                  onChange={(e) => setGuests(e.target.value)}
-                  className="mt-1.5"
-                />
-                {isEntrance ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    You'll receive one QR code per ticket. {remainingForTier} left.
-                  </p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {remainingForTier} reservation spot{remainingForTier === 1 ? "" : "s"} left.
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="prCode">PR Code (optional)</Label>
-                <Input
-                  id="prCode"
-                  value={prCode}
-                  onChange={(e) => setPrCode(e.target.value.toUpperCase())}
-                  placeholder="Referral code"
-                  className="mt-1.5"
-                />
-              </div>
+          {eventSoldOut ? (
+            <div className="mx-auto max-w-xl rounded-2xl border border-destructive/40 bg-destructive/10 p-8 text-center">
+              <AlertTriangle className="mx-auto h-10 w-10 text-destructive" />
+              <h3 className="mt-4 font-display text-3xl tracking-wide text-destructive">Sold Out</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                This event is fully booked. Follow us on Instagram for the next drop.
+              </p>
             </div>
-
-            <div className="mt-5 flex items-start gap-3 rounded-lg border border-border bg-background/30 p-3">
-              <Checkbox
-                id="age"
-                checked={ageConfirmed}
-                onCheckedChange={(c) => {
-                  setAgeConfirmed(!!c);
-                  if (errors.age && c) setErrors({ ...errors, age: undefined });
-                }}
-                className="mt-0.5"
-              />
-              <div className="flex-1">
-                <Label htmlFor="age" className="cursor-pointer text-sm font-normal leading-snug">
-                  I confirm that I am 17 years old or older.{" "}
-                  <span className="text-destructive">*</span>
-                </Label>
-                {errors.age && (
-                  <p className="mt-1 text-xs text-destructive">{errors.age}</p>
-                )}
+          ) : (
+            <>
+              <div className={cn(
+                "grid gap-5",
+                eventTiers.length >= 3 ? "md:grid-cols-3" : eventTiers.length === 2 ? "md:grid-cols-2" : "md:grid-cols-1 max-w-md mx-auto"
+              )}>
+                {eventTiers.map((t) => {
+                  const active = selectedTierId === t.id;
+                  const out = t.remaining <= 0;
+                  const perks = splitPerks(t.perks);
+                  return (
+                    <button
+                      type="button"
+                      key={t.id}
+                      onClick={() => !out && setSelectedTierId(t.id)}
+                      disabled={out}
+                      className={cn(
+                        "group relative rounded-2xl glass p-6 text-left transition-all",
+                        out && "opacity-50 cursor-not-allowed",
+                        active && !out
+                          ? "border-primary shadow-[0_0_40px_-5px_hsl(var(--primary)/0.7),0_0_80px_-20px_hsl(var(--primary)/0.5)] ring-2 ring-primary/60"
+                          : !out && "hover:border-primary/50 hover:shadow-[0_0_25px_-10px_hsl(var(--primary)/0.4)]"
+                      )}
+                    >
+                      {active && !out && (
+                        <span className="absolute right-4 top-4 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <Check className="h-4 w-4" />
+                        </span>
+                      )}
+                      {out && (
+                        <span className="absolute right-4 top-4 rounded-full border border-destructive/50 bg-destructive/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
+                          Sold Out
+                        </span>
+                      )}
+                      <h3 className="font-display text-2xl tracking-wide">{t.name}</h3>
+                      <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                        {t.category === "entrance" ? "Entrance Ticket" : "Reservation"}
+                      </div>
+                      <div className="mt-2 flex items-baseline gap-1">
+                        <span className="text-4xl font-bold">€{Number(t.price_eur)}</span>
+                      </div>
+                      {t.description && (
+                        <p className="mt-3 text-sm text-muted-foreground">{t.description}</p>
+                      )}
+                      {perks.length > 0 && (
+                        <ul className="mt-5 space-y-2 text-sm">
+                          {perks.map((p) => (
+                            <li key={p} className="flex items-start gap-2">
+                              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                              <span>{p}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
 
-            {(lowStock || soldOut) && (
-              <div
-                className={cn(
-                  "mt-6 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
-                  soldOut
-                    ? "border-destructive/40 bg-destructive/10 text-destructive"
-                    : "border-gold/40 bg-gold/10 text-gold"
-                )}
+              <form
+                onSubmit={handleFormSubmit}
+                className="mx-auto mt-12 max-w-2xl rounded-2xl glass-strong p-6 md:p-10"
               >
-                <AlertTriangle className="h-4 w-4" />
-                {soldOut ? "Sold out for this option." : "Almost Sold Out!"}
-              </div>
-            )}
+                <h3 className="font-display text-3xl tracking-wide">Your details</h3>
+                {selected && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    You selected <span className="text-foreground">{selected.name}</span> — €
+                    {isEntrance
+                      ? Number(selected.price_eur) * Math.max(1, parseInt(guests, 10) || 1)
+                      : Number(selected.price_eur)}
+                    {isEntrance && parseInt(guests, 10) > 1 && (
+                      <span className="text-xs"> ({guests} × €{Number(selected.price_eur)})</span>
+                    )}
+                  </p>
+                )}
 
-            <Button
-              type="submit"
-              size="lg"
-              disabled={submitting || verifySending || soldOut}
-              className="mt-6 w-full bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90"
-            >
-              {submitting
-                ? "Redirecting to payment..."
-                : verifySending
-                  ? "Sending verification email..."
-                  : soldOut
-                    ? "Sold out"
-                    : verifiedEmail === email.trim().toLowerCase()
-                      ? `Book & Pay — €${selected ? (isEntrance ? selected.price * Math.max(1, parseInt(guests, 10) || 1) : selected.price) : 0}`
-                      : "Verify email & continue"}
-            </Button>
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              {verifiedEmail === email.trim().toLowerCase()
-                ? "You'll be redirected to Stripe to complete payment securely."
-                : "We'll send a 6-digit code to your email to confirm it before payment."}
-            </p>
-          </form>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="fullName">Full name <span className="text-destructive">*</span></Label>
+                    <Input id="fullName" required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Doe" className="mt-1.5" />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone number <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      required
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        if (errors.phone) setErrors({ ...errors, phone: undefined });
+                      }}
+                      placeholder="+357 99 123 456"
+                      className="mt-1.5"
+                      aria-invalid={!!errors.phone}
+                    />
+                    {errors.phone && <p className="mt-1 text-xs text-destructive">{errors.phone}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (verifiedEmail && e.target.value.trim().toLowerCase() !== verifiedEmail) {
+                          setVerifiedEmail(null);
+                        }
+                        if (errors.email) setErrors({ ...errors, email: undefined });
+                      }}
+                      placeholder="you@example.com"
+                      className="mt-1.5"
+                      aria-invalid={!!errors.email}
+                    />
+                    {errors.email && <p className="mt-1 text-xs text-destructive">{errors.email}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="guests">
+                      {isEntrance ? "Number of tickets" : "Number of people"}{" "}
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="guests"
+                      type="number"
+                      min={1}
+                      max={isEntrance ? Math.max(1, remainingForTier || 50) : 50}
+                      required
+                      value={guests}
+                      onChange={(e) => setGuests(e.target.value)}
+                      className="mt-1.5"
+                    />
+                    {isEntrance ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        You'll receive one QR code per ticket. {remainingForTier} left.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        One reservation covers your whole party. {remainingForTier} spot{remainingForTier === 1 ? "" : "s"} left.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="prCode">PR Code (optional)</Label>
+                    <Input
+                      id="prCode"
+                      value={prCode}
+                      onChange={(e) => setPrCode(e.target.value.toUpperCase())}
+                      placeholder="Referral code"
+                      className="mt-1.5"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-5 flex items-start gap-3 rounded-lg border border-border bg-background/30 p-3">
+                  <Checkbox
+                    id="age"
+                    checked={ageConfirmed}
+                    onCheckedChange={(c) => {
+                      setAgeConfirmed(!!c);
+                      if (errors.age && c) setErrors({ ...errors, age: undefined });
+                    }}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="age" className="cursor-pointer text-sm font-normal leading-snug">
+                      I confirm that I am 17 years old or older.{" "}
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    {errors.age && <p className="mt-1 text-xs text-destructive">{errors.age}</p>}
+                  </div>
+                </div>
+
+                {(lowStock || tierSoldOut) && (
+                  <div
+                    className={cn(
+                      "mt-6 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+                      tierSoldOut
+                        ? "border-destructive/40 bg-destructive/10 text-destructive"
+                        : "border-gold/40 bg-gold/10 text-gold"
+                    )}
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    {tierSoldOut ? "Sold out for this option." : "Almost Sold Out!"}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={submitting || verifySending || tierSoldOut || !selected}
+                  className="mt-6 w-full bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90"
+                >
+                  {submitting
+                    ? "Redirecting to payment..."
+                    : verifySending
+                      ? "Sending verification email..."
+                      : tierSoldOut
+                        ? "Sold out"
+                        : verifiedEmail === email.trim().toLowerCase()
+                          ? `Book & Pay — €${selected ? (isEntrance ? Number(selected.price_eur) * Math.max(1, parseInt(guests, 10) || 1) : Number(selected.price_eur)) : 0}`
+                          : "Verify email & continue"}
+                </Button>
+                <p className="mt-3 text-center text-xs text-muted-foreground">
+                  {verifiedEmail === email.trim().toLowerCase()
+                    ? "You'll be redirected to Stripe to complete payment securely."
+                    : "We'll send a 6-digit code to your email to confirm it before payment."}
+                </p>
+              </form>
+            </>
+          )}
         </section>
       )}
 
@@ -760,8 +714,8 @@ export default function Index() {
                   <strong className="text-foreground">{selected.name}</strong> for{" "}
                   <strong className="text-foreground">{event.title}</strong> — €
                   {isEntrance
-                    ? selected.price * Math.max(1, parseInt(guests, 10) || 1)
-                    : selected.price}
+                    ? Number(selected.price_eur) * Math.max(1, parseInt(guests, 10) || 1)
+                    : Number(selected.price_eur)}
                   {isEntrance
                     ? ` · ${guests} ticket${guests === "1" ? "" : "s"}`
                     : ` · ${guests} guest${guests === "1" ? "" : "s"}`}
@@ -784,8 +738,7 @@ export default function Index() {
             </DialogTitle>
             <DialogDescription>
               We sent a 6-digit code to{" "}
-              <span className="text-foreground">{email.trim().toLowerCase()}</span>. Enter
-              it below to continue. The code expires in 10 minutes.
+              <span className="text-foreground">{email.trim().toLowerCase()}</span>. Enter it below to continue. The code expires in 10 minutes.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -796,9 +749,7 @@ export default function Index() {
               autoComplete="one-time-code"
               maxLength={6}
               value={verifyCode}
-              onChange={(e) =>
-                setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-              }
+              onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="123456"
               className="text-center font-mono text-2xl tracking-[0.5em]"
             />
@@ -812,11 +763,7 @@ export default function Index() {
             </button>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setVerifyOpen(false)}
-              disabled={verifying}
-            >
+            <Button variant="outline" onClick={() => setVerifyOpen(false)} disabled={verifying}>
               Cancel
             </Button>
             <Button onClick={handleVerifyCode} disabled={verifying || verifyCode.length !== 6}>
@@ -826,64 +773,20 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!issuedTicket} onOpenChange={(o) => !o && setIssuedTicket(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Ticket className="h-5 w-5 text-primary" /> Your Ticket
-            </DialogTitle>
-            <DialogDescription>
-              Save this ID. We'll use it to verify entry on the night.
-            </DialogDescription>
-          </DialogHeader>
-          {issuedTicket && (
-            <div className="space-y-4 rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/10 to-accent/10 p-6 text-center">
-              <div className="text-xs uppercase tracking-widest text-muted-foreground">
-                {issuedTicket.eventTitle}
-              </div>
-              <div className="font-display text-xl tracking-wide">{issuedTicket.tierName}</div>
-              <div className="text-sm text-muted-foreground">{issuedTicket.fullName}</div>
-              <div className="rounded-lg border border-border bg-background/50 p-3 font-mono text-lg tracking-[0.2em]">
-                {issuedTicket.code.match(/.{1,4}/g)?.join(" ")}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Ticket ID — keep this for entry
-              </p>
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setIssuedTicket(null)} className="w-full">
-              Done
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={paymentSuccessOpen} onOpenChange={setPaymentSuccessOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-2xl">
-              <Check className="h-6 w-6 text-primary" /> Payment Successful!
+              <Check className="h-6 w-6 text-primary" /> Payment Completed
             </DialogTitle>
-            <DialogDescription>
-              Thank you — your booking is confirmed. A confirmation has been sent to your email.
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/10 to-accent/10 p-6 text-center">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground">
-              Booking Confirmed
-            </div>
             <div className="font-display text-xl tracking-wide">See you on the dancefloor 🎉</div>
-            {successTicketCode && (
-              <>
-                <div className="rounded-lg border border-border bg-background/50 p-3 font-mono text-lg tracking-[0.2em]">
-                  {successTicketCode.match(/.{1,4}/g)?.join(" ")}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Ticket ID — keep this for entry
-                </p>
-              </>
-            )}
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              You should have received an email with your QR code(s).
+              <br />
+              If you haven't, please give us a call.
+            </p>
           </div>
           <DialogFooter>
             <Button onClick={() => setPaymentSuccessOpen(false)} className="w-full">
