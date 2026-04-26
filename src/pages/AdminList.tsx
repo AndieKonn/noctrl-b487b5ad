@@ -61,6 +61,7 @@ type BookingRow = {
   email: string;
   phone: string;
   tier: "standard" | "vip" | "entrance";
+  tier_id: string | null;
   number_of_guests: number;
   payment_status: "pending" | "paid" | "cancelled";
   event_id: string | null;
@@ -163,7 +164,7 @@ export default function AdminList() {
     const { data: bs } = await supabase
       .from("bookings")
       .select(
-        "id, full_name, email, phone, tier, number_of_guests, payment_status, event_id, price_eur, pr_code, created_at",
+        "id, full_name, email, phone, tier, tier_id, number_of_guests, payment_status, event_id, price_eur, pr_code, created_at",
       )
       .eq("event_id", eventId)
       .eq("payment_status", "paid")
@@ -306,8 +307,6 @@ export default function AdminList() {
     const booking = bookings.find((b) => b.id === entry.bookingId);
     if (!booking) return;
 
-    // Delete the booking (tickets cascade or are deleted via separate call)
-    // First delete tickets for this booking
     await supabase.from("tickets").delete().eq("booking_id", booking.id);
     const { error } = await supabase.from("bookings").delete().eq("id", booking.id);
     if (error) {
@@ -315,13 +314,30 @@ export default function AdminList() {
       return;
     }
 
-    // Increment capacity back on the event
+    // Restore capacity. Prefer the dynamic event_tiers row; otherwise legacy event counters.
+    if (booking.tier_id) {
+      const { data: tier } = await supabase
+        .from("event_tiers")
+        .select("id, remaining, category")
+        .eq("id", booking.tier_id)
+        .maybeSingle();
+      if (tier) {
+        const restore =
+          tier.category === "entrance" ? booking.number_of_guests : 1;
+        await supabase
+          .from("event_tiers")
+          .update({ remaining: tier.remaining + restore })
+          .eq("id", tier.id);
+      }
+    }
+
+    // Also mirror back to legacy counters when relevant
     const ev = events.find((e) => e.id === booking.event_id);
     if (ev) {
       const update =
         booking.tier === "entrance"
           ? { tickets_remaining: ev.tickets_remaining + booking.number_of_guests }
-          : { reservations_remaining: ev.reservations_remaining + booking.number_of_guests };
+          : { reservations_remaining: ev.reservations_remaining + 1 };
       await supabase.from("events").update(update).eq("id", ev.id);
       setEvents((prev) =>
         prev.map((e) => (e.id === ev.id ? ({ ...e, ...update } as EventRow) : e)),
@@ -333,7 +349,7 @@ export default function AdminList() {
     toast.success(
       booking.tier === "entrance"
         ? `Removed — ${booking.number_of_guests} entrance ticket${booking.number_of_guests === 1 ? "" : "s"} returned to availability.`
-        : `Removed — ${booking.number_of_guests} reservation spot${booking.number_of_guests === 1 ? "" : "s"} returned to availability.`,
+        : `Removed — 1 reservation spot returned to availability.`,
     );
   };
 
