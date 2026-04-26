@@ -27,6 +27,7 @@ function buildEmailHtml(opts: {
   fullName: string;
   eventTitle: string;
   tierLabel: string;
+  isEntrance: boolean;
   guests: number;
   ticketCount: number;
   eventDate: string | null;
@@ -74,7 +75,7 @@ function buildEmailHtml(opts: {
           <p style="margin:0 0 24px 0;font-size:15px;color:#d8d2b8;line-height:1.65;">${intro}</p>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(20,19,13,0.7);border:1px solid rgba(245,214,61,0.2);border-radius:12px;padding:18px 20px;margin:0 0 24px 0;">
             <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Tier</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${tierLabel}</td></tr>
-            <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">${opts.tier === "entrance" ? "Tickets" : "Guests"}</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${opts.guests}</td></tr>
+            <tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">${opts.isEntrance ? "Tickets" : "Guests"}</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${opts.guests}</td></tr>
             ${dateLine}
           </table>
         </td></tr>
@@ -261,7 +262,8 @@ Deno.serve(async (req) => {
             const html = buildEmailHtml({
               fullName: booking.full_name,
               eventTitle,
-              tier: booking.tier,
+              tierLabel: tierLabelStr,
+              isEntrance,
               guests: booking.number_of_guests,
               ticketCount,
               eventDate: booking.event_date,
