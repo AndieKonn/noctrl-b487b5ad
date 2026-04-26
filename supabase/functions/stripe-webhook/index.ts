@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
         const { data: booking, error: fetchErr } = await supabase
           .from("bookings")
           .select(
-            "id, ticket_code, full_name, email, tier, number_of_guests, event_date, event_id, payment_status",
+            "id, ticket_code, full_name, email, tier, tier_id, number_of_guests, event_date, event_id, payment_status",
           )
           .eq("ticket_code", ticketCode)
           .maybeSingle();
@@ -176,10 +176,21 @@ Deno.serve(async (req) => {
           if (ev?.title) eventTitle = ev.title;
         }
 
-        // How many QR codes does this buyer get?
-        // - reservations: 1 (whole party)
-        // - entrance: N (one per individual ticket)
-        const isEntrance = booking.tier === "entrance";
+        // Determine category from tier_id (preferred) or legacy tier enum
+        let isEntrance = booking.tier === "entrance";
+        let tierLabelStr = isEntrance ? "Entrance Ticket"
+          : booking.tier === "vip" ? "VIP Reservation" : "Standard Reservation";
+        if (booking.tier_id) {
+          const { data: t } = await supabase
+            .from("event_tiers")
+            .select("name, category")
+            .eq("id", booking.tier_id)
+            .maybeSingle();
+          if (t) {
+            isEntrance = t.category === "entrance";
+            tierLabelStr = t.name;
+          }
+        }
         const ticketCount = isEntrance ? Math.max(1, booking.number_of_guests) : 1;
 
         // Make sure we don't double-create on webhook retry
