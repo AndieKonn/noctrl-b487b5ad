@@ -8,6 +8,7 @@ import Index from "./pages/Index.tsx";
 import AdminPortal from "./pages/AdminPortal.tsx";
 import AdminPortalDashboard from "./pages/AdminPortalDashboard.tsx";
 import AdminList from "./pages/AdminList.tsx";
+import Gallery from "./pages/Gallery.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Verify from "./pages/Verify.tsx";
 import StaffLogin from "./pages/StaffLogin.tsx";
@@ -32,6 +33,7 @@ const App = () => {
             <Route path="/admin-portal" element={<AdminPortal />} />
             <Route path="/admin-portal/dashboard" element={<AdminPortalDashboard />} />
             <Route path="/list" element={<AdminList />} />
+            <Route path="/gallery" element={<Gallery />} />
             <Route path="/verify" element={<Verify />} />
             <Route path="/staff/login" element={<StaffLogin />} />
             <Route
