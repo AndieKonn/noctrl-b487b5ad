@@ -26,17 +26,13 @@ function generateTicketCode() {
 function buildEmailHtml(opts: {
   fullName: string;
   eventTitle: string;
-  tier: string;
+  tierLabel: string;
   guests: number;
   ticketCount: number;
   eventDate: string | null;
   ticketCodes: string[];
 }) {
-  const tierLabel = opts.tier === "entrance"
-    ? "Entrance Ticket"
-    : opts.tier === "vip"
-    ? "VIP Reservation"
-    : "Standard Reservation";
+  const tierLabel = opts.tierLabel;
   const dateLine = opts.eventDate
     ? `<tr><td style="padding:8px 0;color:#bfb38a;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Date</td><td style="padding:8px 0;color:#f7f3e3;text-align:right;font-weight:700;font-size:15px;">${opts.eventDate}</td></tr>`
     : "";
