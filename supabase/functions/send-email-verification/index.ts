@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "NoCTRL <onboarding@resend.dev>",
+      from: "NoCTRL <noreply@noctrlcy.com>",
       to: [email],
       subject: `Your NoCTRL verification code: ${code}`,
       html: buildEmailHtml(code),

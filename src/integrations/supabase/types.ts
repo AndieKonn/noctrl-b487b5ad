@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      album_photos: {
+        Row: {
+          album_id: string
+          caption: string | null
+          created_at: string
+          id: string
+          sort_order: number
+          storage_path: string
+        }
+        Insert: {
+          album_id: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          sort_order?: number
+          storage_path: string
+        }
+        Update: {
+          album_id?: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          sort_order?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "album_photos_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "event_albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           created_at: string
@@ -30,6 +65,7 @@ export type Database = {
           qr_code_data_url: string | null
           ticket_code: string | null
           tier: Database["public"]["Enums"]["booking_tier"]
+          tier_id: string | null
           updated_at: string
           used_at: string | null
         }
@@ -48,6 +84,7 @@ export type Database = {
           qr_code_data_url?: string | null
           ticket_code?: string | null
           tier: Database["public"]["Enums"]["booking_tier"]
+          tier_id?: string | null
           updated_at?: string
           used_at?: string | null
         }
@@ -66,6 +103,7 @@ export type Database = {
           qr_code_data_url?: string | null
           ticket_code?: string | null
           tier?: Database["public"]["Enums"]["booking_tier"]
+          tier_id?: string | null
           updated_at?: string
           used_at?: string | null
         }
@@ -75,6 +113,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "event_tiers"
             referencedColumns: ["id"]
           },
         ]
@@ -108,6 +153,100 @@ export type Database = {
           verified_at?: string | null
         }
         Relationships: []
+      }
+      event_albums: {
+        Row: {
+          cover_url: string | null
+          created_at: string
+          description: string
+          event_id: string | null
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_url?: string | null
+          created_at?: string
+          description?: string
+          event_id?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_url?: string | null
+          created_at?: string
+          description?: string
+          event_id?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_albums_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_tiers: {
+        Row: {
+          capacity: number
+          category: Database["public"]["Enums"]["tier_category"]
+          created_at: string
+          description: string
+          event_id: string
+          id: string
+          is_active: boolean
+          name: string
+          perks: string
+          price_eur: number
+          remaining: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number
+          category: Database["public"]["Enums"]["tier_category"]
+          created_at?: string
+          description?: string
+          event_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          perks?: string
+          price_eur?: number
+          remaining?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number
+          category?: Database["public"]["Enums"]["tier_category"]
+          created_at?: string
+          description?: string
+          event_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          perks?: string
+          price_eur?: number
+          remaining?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_tiers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       events: {
         Row: {
@@ -271,6 +410,7 @@ export type Database = {
       app_role: "admin" | "user" | "staff"
       booking_tier: "standard" | "vip" | "entrance"
       payment_status: "pending" | "paid" | "cancelled"
+      tier_category: "entrance" | "reservation"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -401,6 +541,7 @@ export const Constants = {
       app_role: ["admin", "user", "staff"],
       booking_tier: ["standard", "vip", "entrance"],
       payment_status: ["pending", "paid", "cancelled"],
+      tier_category: ["entrance", "reservation"],
     },
   },
 } as const
