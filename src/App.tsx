@@ -9,6 +9,7 @@ import AdminPortal from "./pages/AdminPortal.tsx";
 import AdminPortalDashboard from "./pages/AdminPortalDashboard.tsx";
 import AdminList from "./pages/AdminList.tsx";
 import Gallery from "./pages/Gallery.tsx";
+import Menu from "./pages/Menu.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Verify from "./pages/Verify.tsx";
 import StaffLogin from "./pages/StaffLogin.tsx";
