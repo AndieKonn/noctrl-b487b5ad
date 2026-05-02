@@ -203,6 +203,10 @@ export default function AdminPortalDashboard() {
             <GalleryManager albums={albums} events={events} onChange={load} />
           </TabsContent>
 
+          <TabsContent value="menu" className="mt-4">
+            <MenuManager />
+          </TabsContent>
+
           <TabsContent value="prcodes" className="mt-4">
             <PrCodesManager codes={prCodes} onChange={load} />
           </TabsContent>
