@@ -6,6 +6,8 @@ import {
   ListChecks, Image as ImageIcon, Sparkles, Layers, X,
 } from "lucide-react";
 import StaffManager from "@/components/admin/StaffManager";
+import MenuManager from "@/components/admin/MenuManager";
+import { Wine } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -179,6 +181,7 @@ export default function AdminPortalDashboard() {
           <TabsList>
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="gallery"><ImageIcon className="mr-1.5 h-3.5 w-3.5" />Gallery</TabsTrigger>
+            <TabsTrigger value="menu"><Wine className="mr-1.5 h-3.5 w-3.5" />Menu</TabsTrigger>
             <TabsTrigger value="prcodes">PR Codes</TabsTrigger>
             <TabsTrigger value="staff">
               <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />Door Crew
@@ -198,6 +201,10 @@ export default function AdminPortalDashboard() {
 
           <TabsContent value="gallery" className="mt-4">
             <GalleryManager albums={albums} events={events} onChange={load} />
+          </TabsContent>
+
+          <TabsContent value="menu" className="mt-4">
+            <MenuManager />
           </TabsContent>
 
           <TabsContent value="prcodes" className="mt-4">
