@@ -359,32 +359,70 @@ export default function Index() {
             <img src={logo} alt="NoCTRL logo" className="h-8 w-8 object-contain md:h-10 md:w-10" />
             <span className="font-display text-2xl tracking-widest md:text-3xl">NOCTRL</span>
           </div>
+          <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
+            <span
+              aria-current="page"
+              className="font-display text-sm uppercase tracking-[0.25em] text-primary"
+            >
+              Home
+            </span>
+            <Link
+              to="/gallery"
+              className="font-display text-sm uppercase tracking-[0.25em] text-foreground/80 transition-colors hover:text-primary"
+            >
+              Gallery
+            </Link>
+            <Link
+              to="/menu"
+              className="font-display text-sm uppercase tracking-[0.25em] text-foreground/80 transition-colors hover:text-primary"
+            >
+              Menu
+            </Link>
+          </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <Link
               to="/gallery"
               aria-label="Gallery"
-              title="Event Gallery"
-              className="group inline-flex items-center gap-1.5 rounded-xl px-2 py-1 text-primary transition-all duration-300 hover:scale-105 hover:text-accent hover:shadow-[var(--shadow-glow)]"
+              className="inline-flex items-center justify-center rounded-xl p-1 text-primary transition-all duration-300 hover:scale-110 hover:text-accent md:hidden"
             >
-              <ImageIcon className="h-7 w-7 md:h-9 md:w-9" strokeWidth={2.25} />
-              <span className="hidden sm:inline font-display text-sm tracking-[0.2em] uppercase">Gallery</span>
+              <ImageIcon className="h-7 w-7" strokeWidth={2.25} />
+            </Link>
+            <Link
+              to="/menu"
+              aria-label="Menu"
+              className="inline-flex items-center justify-center rounded-xl p-1 text-primary transition-all duration-300 hover:scale-110 hover:text-accent md:hidden"
+            >
+              <Wine className="h-7 w-7" strokeWidth={2.25} />
             </Link>
             <a
               href="mailto:noctrlcy@gmail.com"
               aria-label="Email NoCTRL"
               title="noctrlcy@gmail.com"
-              className="group inline-flex items-center justify-center rounded-xl p-1 text-primary transition-all duration-300 hover:scale-110 hover:text-accent hover:shadow-[var(--shadow-glow)]"
+              className="inline-flex items-center justify-center rounded-xl p-1 text-primary transition-all duration-300 hover:scale-110 hover:text-accent hover:shadow-[var(--shadow-glow)]"
             >
               <Mail className="h-8 w-8 md:h-10 md:w-10" strokeWidth={2.25} />
             </a>
             <a
-              href="https://www.instagram.com/no.ctrl_events/"
+              href="https://www.instagram.com/noctrl.events/"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="NoCTRL on Instagram"
-              className="group inline-flex items-center justify-center rounded-xl p-1 transition-all duration-300 hover:scale-110 hover:shadow-[var(--shadow-glow)]"
+              className="inline-flex items-center justify-center rounded-xl p-1 text-foreground transition-all duration-300 hover:scale-110 hover:text-primary"
             >
-              <Instagram className="h-8 w-8 md:h-10 md:w-10 text-primary" strokeWidth={2.25} />
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-8 w-8 md:h-10 md:w-10"
+                aria-hidden="true"
+              >
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+              </svg>
             </a>
           </div>
         </nav>
