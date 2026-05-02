@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { Check, Sparkles, AlertTriangle, Instagram, Mail, Image as ImageIcon } from "lucide-react";
+import { Check, Sparkles, AlertTriangle, Mail, Image as ImageIcon, Wine } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
