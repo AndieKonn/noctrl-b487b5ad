@@ -51,7 +51,7 @@ type EventTier = {
   is_active: boolean;
 };
 
-const LOW_STOCK_PCT = 0.1;
+const LOW_STOCK_PCT = 0.25;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_REGEX = /^\+?[0-9\s().-]{7,20}$/;
 
