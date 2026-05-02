@@ -6,6 +6,8 @@ import {
   ListChecks, Image as ImageIcon, Sparkles, Layers, X,
 } from "lucide-react";
 import StaffManager from "@/components/admin/StaffManager";
+import MenuManager from "@/components/admin/MenuManager";
+import { Wine } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
