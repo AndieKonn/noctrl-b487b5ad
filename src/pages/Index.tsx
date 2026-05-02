@@ -532,6 +532,8 @@ export default function Index() {
                 {eventTiers.map((t) => {
                   const active = selectedTierId === t.id;
                   const out = t.remaining <= 0;
+                  const almost =
+                    !out && t.capacity > 0 && t.remaining / t.capacity <= LOW_STOCK_PCT;
                   const perks = splitPerks(t.perks);
                   return (
                     <button
@@ -555,6 +557,11 @@ export default function Index() {
                       {out && (
                         <span className="absolute right-4 top-4 rounded-full border border-destructive/50 bg-destructive/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-destructive">
                           Sold Out
+                        </span>
+                      )}
+                      {!out && almost && !active && (
+                        <span className="absolute right-4 top-4 rounded-full border border-primary/60 bg-primary/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-primary">
+                          Almost Sold Out
                         </span>
                       )}
                       <h3 className="font-display text-2xl tracking-wide">{t.name}</h3>
