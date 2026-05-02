@@ -181,6 +181,7 @@ export default function AdminPortalDashboard() {
           <TabsList>
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="gallery"><ImageIcon className="mr-1.5 h-3.5 w-3.5" />Gallery</TabsTrigger>
+            <TabsTrigger value="menu"><Wine className="mr-1.5 h-3.5 w-3.5" />Menu</TabsTrigger>
             <TabsTrigger value="prcodes">PR Codes</TabsTrigger>
             <TabsTrigger value="staff">
               <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />Door Crew
